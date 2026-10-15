@@ -111,6 +111,9 @@ class Component extends DCLogic {
       formMsg: '', formOk: true,
       reviewer: 'LMCM',
       buscar: '', filtroVista: 'autorizar', flash: '', flashPagar: false, undo: null,
+      rol: '', userEmail: '', proveedoresCat: [], solicitantesCat: [], rolesList: [],
+      catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' }, catObra: { nombre: '', division: 'HOTELERIA' }, catSol: { nombre: '', puesto: '' },
+      rolForm: { email: '', nombre: '', rol: 'compras' }, catMsg: '', catOk: true,
       payBank: {},
       finFilter: 'TODOS',
       weekOffset: 0,
@@ -188,6 +191,67 @@ class Component extends DCLogic {
     });
   }
 
+  slug(t) { return (String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120)) || 'X'; }
+  clabeOk(c) {
+    if (!/^\d{18}$/.test(c)) return false;
+    const w = [3, 7, 1]; let t = 0;
+    for (let i = 0; i < 17; i++) t += (Number(c[i]) * w[i % 3]) % 10;
+    return (10 - (t % 10)) % 10 === Number(c[17]);
+  }
+  bancoDeClabe(c) {
+    const B = { '002': 'BANAMEX', '006': 'BANCOMEXT', '009': 'BANOBRAS', '012': 'BBVA MÉXICO', '014': 'SANTANDER', '019': 'BANJERCITO', '021': 'HSBC', '030': 'BAJÍO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '060': 'BANSI', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '112': 'BMONEX', '127': 'BANCO AZTECA', '130': 'COMPARTAMOS', '132': 'MULTIVA', '133': 'ACTINVER', '136': 'INTERCAM', '137': 'BANCOPPEL', '138': 'UALÁ', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '148': 'PAGATODO', '150': 'INMOBILIARIO', '151': 'DONDE', '152': 'BANCREA', '155': 'ICBC', '156': 'SABADELL', '166': 'BANCO DEL BIENESTAR', '167': 'HEY BANCO', '638': 'NU MÉXICO', '646': 'STP', '722': 'MERCADO PAGO W', '728': 'SPIN BY OXXO' };
+    return B[String(c || '').slice(0, 3)] || '';
+  }
+  setCat(grupo, k, v) {
+    this.setState(s => {
+      const o = Object.assign({}, s[grupo], { [k]: v });
+      if (grupo === 'catProv' && k === 'clabe') { const d = v.replace(/\D/g, '').slice(0, 18); o.clabe = d; const b = this.bancoDeClabe(d); if (b && (!s.catProv.banco || s.catProv.banco === this.bancoDeClabe(s.catProv.clabe))) o.banco = b; }
+      return { [grupo]: o, catMsg: '' };
+    });
+  }
+  catAviso(msg, ok) { this.setState({ catMsg: msg, catOk: !!ok }); }
+  guardarProv() {
+    const s = this.state, p = s.catProv;
+    const nombreComercial = p.nombreComercial.trim().toUpperCase(), beneficiario = p.beneficiario.trim().toUpperCase(), banco = p.banco.trim().toUpperCase(), clabe = p.clabe.trim();
+    const falta = []; if (!nombreComercial) falta.push('nombre comercial'); if (!beneficiario) falta.push('beneficiario'); if (!clabe) falta.push('CLABE'); if (!banco) falta.push('banco');
+    if (falta.length) return this.catAviso('Falta: ' + falta.join(', ') + '.');
+    if (!this.clabeOk(clabe)) return this.catAviso('La CLABE no es válida: deben ser 18 dígitos y el último es de control. Revísala con el estado de cuenta del proveedor.');
+    const id = p.id || this.slug(nombreComercial);
+    if (!p.id && s.proveedoresCat.some(x => x.id === id)) return this.catAviso('Ya existe un proveedor con ese nombre comercial. Usa «Editar» para cambiar sus datos.');
+    const data = { nombreComercial, beneficiario, banco, clabe, actualizo: s.userEmail || '' };
+    this.setState({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== id).concat([Object.assign({ id }, data)]), catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' } });
+    if (this.db) this.db.doc('proveedores/' + id).set(data).catch(e => this.dbErr(e));
+    this.catAviso('Proveedor ' + nombreComercial + ' guardado.', true);
+  }
+  guardarObra() {
+    const s = this.state, nombre = s.catObra.nombre.trim().toUpperCase();
+    if (!nombre) return this.catAviso('Escribe el nombre de la obra.');
+    if (s.obraDiv[nombre]) return this.catAviso('La obra ' + nombre + ' ya existe.');
+    const map = Object.assign({}, s.obraDiv, { [nombre]: s.catObra.division });
+    this.setState({ obraDiv: map, catObra: { nombre: '', division: 'HOTELERIA' } });
+    this.saveObras(map);
+    this.catAviso('Obra ' + nombre + ' agregada a ' + (s.catObra.division === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería') + '.', true);
+  }
+  guardarSol() {
+    const s = this.state, nombre = s.catSol.nombre.trim().toUpperCase(), puesto = s.catSol.puesto.trim().toUpperCase();
+    if (!nombre) return this.catAviso('Escribe el nombre de quien solicita.');
+    const id = this.slug(nombre);
+    if (s.solicitantesCat.some(x => x.id === id)) return this.catAviso(nombre + ' ya está registrado.');
+    this.setState({ solicitantesCat: s.solicitantesCat.concat([{ id, nombre, puesto }]), catSol: { nombre: '', puesto: '' } });
+    if (this.db) this.db.doc('solicitantes/' + id).set({ nombre, puesto }).catch(e => this.dbErr(e));
+    this.catAviso(nombre + ' agregado.', true);
+  }
+  async guardarRol() {
+    const f = this.state.rolForm, email = f.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return this.catAviso('Escribe un correo válido.');
+    if (!window.__rolesApi) return;
+    const r = await window.__rolesApi.guardar({ email, nombre: f.nombre.trim(), rol: f.rol });
+    if (r.error) return this.catAviso('No se pudo guardar el permiso: ' + r.error.message);
+    this.setState({ rolForm: { email: '', nombre: '', rol: 'compras' } });
+    this.catAviso('Permiso guardado para ' + email + '.', true);
+    window.__rolesApi.cargar();
+  }
+
   async descargarReporte(titulo) {
     let dl = null; try { dl = await window.claude.use('downloads'); } catch (e) {}
     if (!dl) { this.setState({ dbMsg: 'Esta vista no permite descargar archivos.' }); return; }
@@ -232,7 +296,9 @@ class Component extends DCLogic {
       fpCorto: this.fd(r.fechaPago).slice(0, 5),
       esDevuelto: !!r.devuelto, devTxt: r.devuelto ? 'Devuelto ' + this.fd(r.devuelto) : '',
       diasDev: r.fechaPago ? Math.max(0, this.dias(r.fechaPago, hoy)) : 0,
-      puedeActuar: ['PENDIENTE', 'REVISION', 'SIN_PAGO_CLIENTE', 'CANCELADO'].indexOf(b) >= 0,
+      puedeActuar: this.state.rol === 'direccion' && ['PENDIENTE', 'REVISION', 'SIN_PAGO_CLIENTE', 'CANCELADO'].indexOf(b) >= 0,
+      provCuenta: (this._provMap && this._provMap[r.proveedor]) ? (this._provMap[r.proveedor].banco + ' · CLABE ' + this._provMap[r.proveedor].clabe) : 'Sin datos bancarios en catálogo',
+      provCuentaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:' + ((this._provMap && this._provMap[r.proveedor]) ? '#33363C' : '#9F1D12'),
       puedeRegresar: b !== 'PENDIENTE', regresarTxt: b === 'CANCELADO' ? 'Reactivar a por autorizar' : 'Regresar a por autorizar',
       onRegresar: () => { this.upd(id, { estatus: 'PENDIENTE', fechaAut: '' }); this.setState({ flash: r.oc + ' regresó a «Por autorizar».', flashPagar: false, undo: null }); },
       onDevolver: () => this.upd(id, { devuelto: hoyS }),
@@ -249,8 +315,11 @@ class Component extends DCLogic {
     if (!oc) falta.push('OC'); if (!monto) falta.push('monto'); if (!prov) falta.push('proveedor'); if (!sol) falta.push('quién solicita');
     if (falta.length) { this.setState({ formMsg: 'Falta: ' + falta.join(', ') + '.', formOk: false }); return; }
     if (s.rows.some(r => r.oc === oc && r.estatus !== 'CANCELADO')) { this.setState({ formMsg: 'La OC ' + oc + ' ya está en el filtro.', formOk: false }); return; }
+    if (!s.proveedoresCat.some(p => p.nombreComercial === prov)) { this.setState({ formMsg: 'El proveedor ' + prov + ' no está registrado. Regístralo en Catálogos con su CLABE, banco y beneficiario.', formOk: false }); return; }
+    if (!s.obraDiv[obra]) { this.setState({ formMsg: 'La obra ' + obra + ' no está registrada. Agrégala en Catálogos.', formOk: false }); return; }
+    if (!s.solicitantesCat.some(p => p.nombre === sol)) { this.setState({ formMsg: sol + ' no está registrado en «Quién solicita». Agrégalo en Catálogos.', formOk: false }); return; }
     let id = oc.replace(/[^A-Za-z0-9_\-.~:@+]/g, '_'); if (!id || id === '.' || id === '..') id = 'oc'; if (s.rows.some(r => r.id === id)) id = id + '_' + Date.now();
-    const row = { id, oc, monto, proveedor: prov, obra, solicita: sol, notas: f.notas.trim(), estatus: 'PENDIENTE', division: f.division, fechaCaptura: this.hoy(), fechaAut: '', banco: '', fechaPago: '', notaDir: '' };
+    const row = { id, oc, monto, proveedor: prov, obra, solicita: sol, notas: f.notas.trim(), estatus: 'PENDIENTE', division: f.division, fechaCaptura: this.hoy(), fechaAut: '', banco: '', fechaPago: '', notaDir: '', capturo: s.userEmail || '' };
     if (this.db) { const body = Object.assign({}, row); delete body.id; this.db.doc('ocs/' + id).set(body).catch(e => this.dbErr(e)); }
     if (s.obraDiv[obra] !== f.division) this.saveObras(Object.assign({}, s.obraDiv, { [obra]: f.division }));
     const add = (arr, v) => arr.indexOf(v) >= 0 ? arr : arr.concat([v]).sort();
@@ -265,7 +334,12 @@ class Component extends DCLogic {
   }
 
   renderVals() {
-    const st = this.state, hoy = this.hoy();
+    const rol = this.state.rol || '';
+    const esDir = rol === 'direccion', esConta = rol === 'contabilidad', esCompras = !esDir && !esConta;
+    const permitidas = esCompras ? ['captura', 'filtro', 'catalogos'] : null;
+    const st = (permitidas && permitidas.indexOf(this.state.tab) < 0) ? Object.assign({}, this.state, { tab: 'captura', report: null }) : this.state;
+    const hoy = this.hoy();
+    this._provMap = {}; (st.proveedoresCat || []).forEach(p => { this._provMap[p.nombreComercial] = p; });
     const dA = this.props.diasAlerta ?? 2, dC = this.props.diasCritico ?? 4;
     const rows = st.rows.map(r => this.decorate(r, hoy, dA, dC));
     const B = ['PAGADO', 'POR_PAGAR', 'REVISION', 'SIN_PAGO_CLIENTE', 'PENDIENTE'];
@@ -273,7 +347,7 @@ class Component extends DCLogic {
 
     // tabs
     const lateAll = rows.filter(r => (r.bucket === 'PENDIENTE' || r.bucket === 'REVISION') && r.isCrit).length;
-    const tabDefs = [['captura', 'Captura · Compras', 0], ['filtro', 'Filtro de autorización', lateAll], ['finanzas', 'Estado financiero', 0], ['semana', 'Resumen semanal', 0], ['depositos', 'Depósitos y saldos', 0], ['personal', 'Cuenta personal Manuel', 0], ['santander', 'Cuenta Santander', 0], ['banorte', 'Cuenta Banorte', 0]];
+    const tabDefs = [['captura', 'Captura · Compras', 0], ['filtro', 'Filtro de autorización', lateAll], ['finanzas', 'Estado financiero', 0], ['semana', 'Resumen semanal', 0], ['depositos', 'Depósitos y saldos', 0], ['personal', 'Cuenta personal Manuel', 0], ['santander', 'Cuenta Santander', 0], ['banorte', 'Cuenta Banorte', 0], ['catalogos', 'Catálogos', 0]].filter(t => !permitidas || permitidas.indexOf(t[0]) >= 0);
     const tabs = tabDefs.map(t => ({
       label: t[1], badge: t[2], hasBadge: t[2] > 0,
       go: () => this.setState({ tab: t[0], report: null }),
@@ -592,7 +666,41 @@ class Component extends DCLogic {
       onSol: (e) => this.setForm('solicita', e.target.value), onNotas: (e) => this.setForm('notas', e.target.value),
       onDiv: (e) => this.setForm('division', e.target.value),
       autorizaForm: this.AUTORIZA[f.division],
-      proveedores: st.proveedores.map(v => ({ v })), solicitantes: st.solicitantes.map(v => ({ v })),
+      proveedores: (st.proveedoresCat || []).map(p => ({ v: p.nombreComercial })).sort((a, b) => a.v.localeCompare(b.v)),
+      solicitantes: (st.solicitantesCat || []).map(p => ({ v: p.nombre })).sort((a, b) => a.v.localeCompare(b.v)),
+      hasProvInfo: !!f.proveedor.trim(),
+      provInfo: (() => { const p = this._provMap[f.proveedor.trim().toUpperCase()]; return p ? (p.banco + ' · CLABE ' + p.clabe + ' · ' + p.beneficiario) : 'No está registrado. Regístralo en Catálogos con su CLABE antes de enviar la OC.'; })(),
+      provInfoStyle: 'font-size:12px;font-weight:600;color:' + (this._provMap[f.proveedor.trim().toUpperCase()] ? '#14532D' : '#9F1D12'),
+      hasObraInfo: !!f.obra.trim() && !st.obraDiv[f.obra.trim().toUpperCase()], obraInfo: 'Obra no registrada. Agrégala en Catálogos.',
+      hasSolInfo: !!f.solicita.trim() && !(st.solicitantesCat || []).some(p => p.nombre === f.solicita.trim().toUpperCase()), solInfo: 'Nombre no registrado. Agrégalo en Catálogos.',
+      canAutorizar: esDir, noAutoriza: !esDir, canPagar: esDir || esConta, esDireccion: esDir, canBorrarCat: esDir || esConta,
+      sinRol: !!st.loaded && !rol,
+      isCatalogos: st.tab === 'catalogos' && !st.report,
+      hasCatMsg: !!st.catMsg, catMsg: st.catMsg,
+      catMsgStyle: 'margin:0 0 16px;padding:10px 12px;border-radius:6px;font-size:14px;font-weight:600;' + (st.catOk ? 'background:#DCEFE4;color:#14532D' : 'background:#FBE0DC;color:#9F1D12'),
+      catProv: st.catProv, catObra: st.catObra, catSol: st.catSol, rolForm: st.rolForm,
+      onProvCom: (e) => this.setCat('catProv', 'nombreComercial', e.target.value), onProvBen: (e) => this.setCat('catProv', 'beneficiario', e.target.value),
+      onProvClabe: (e) => this.setCat('catProv', 'clabe', e.target.value), onProvBanco: (e) => this.setCat('catProv', 'banco', e.target.value),
+      clabeHint: !st.catProv.clabe ? 'La encuentras en el estado de cuenta o la carátula del proveedor.' : (st.catProv.clabe.length < 18 ? st.catProv.clabe.length + ' de 18 dígitos' : (this.clabeOk(st.catProv.clabe) ? 'CLABE válida' : 'CLABE no válida: revisa los dígitos')),
+      clabeHintStyle: 'font-size:12px;font-weight:600;color:' + (!st.catProv.clabe || st.catProv.clabe.length < 18 ? '#5B5F68' : (this.clabeOk(st.catProv.clabe) ? '#14532D' : '#9F1D12')),
+      guardarProv: () => this.guardarProv(), provBtnTxt: st.catProv.id ? 'Guardar cambios' : 'Registrar proveedor', editandoProv: !!st.catProv.id,
+      cancelarProv: () => this.setState({ catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' }, catMsg: '' }),
+      provLista: (st.proveedoresCat || []).slice().sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial)).map(p => ({
+        nombreComercial: p.nombreComercial, beneficiario: p.beneficiario, banco: p.banco, clabeFmt: String(p.clabe || '').replace(/(\d{3})(\d{3})(\d{11})(\d)/, '$1 $2 $3 $4'),
+        editar: () => this.setState({ catProv: { id: p.id, nombreComercial: p.nombreComercial, beneficiario: p.beneficiario, banco: p.banco, clabe: p.clabe }, catMsg: '' }),
+        borrar: () => { this.setState(s => ({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== p.id) })); if (this.db) this.db.doc('proveedores/' + p.id).delete().catch(e => this.dbErr(e)); this.catAviso('Proveedor ' + p.nombreComercial + ' borrado.', true); }
+      })),
+      provSinDatos: Array.from(new Set(st.rows.map(r => r.proveedor))).filter(n => n && !this._provMap[n]).sort().map(n => ({ nombre: n, completar: () => this.setState({ catProv: { id: '', nombreComercial: n, beneficiario: '', banco: '', clabe: '' }, catMsg: '' }) })),
+      hasProvSinDatos: st.rows.some(r => r.proveedor && !this._provMap[r.proveedor]),
+      onObraNom: (e) => this.setCat('catObra', 'nombre', e.target.value), onObraDiv: (e) => this.setCat('catObra', 'division', e.target.value), guardarObra: () => this.guardarObra(),
+      obraLista: Object.keys(st.obraDiv).sort().map(k => ({ nombre: k, division: st.obraDiv[k] === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería' })),
+      onSolNom: (e) => this.setCat('catSol', 'nombre', e.target.value), onSolPue: (e) => this.setCat('catSol', 'puesto', e.target.value), guardarSol: () => this.guardarSol(),
+      solLista: (st.solicitantesCat || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => ({ nombre: p.nombre, puesto: p.puesto || '',
+        borrar: () => { this.setState(s => ({ solicitantesCat: s.solicitantesCat.filter(x => x.id !== p.id) })); if (this.db) this.db.doc('solicitantes/' + p.id).delete().catch(e => this.dbErr(e)); } })),
+      onRolMail: (e) => this.setCat('rolForm', 'email', e.target.value), onRolNom: (e) => this.setCat('rolForm', 'nombre', e.target.value), onRolRol: (e) => this.setCat('rolForm', 'rol', e.target.value),
+      guardarRol: () => this.guardarRol(),
+      rolesLista: (st.rolesList || []).map(u => ({ email: u.email, nombre: u.nombre || '', rolTxt: u.rol === 'direccion' ? 'Dirección' : u.rol === 'contabilidad' ? 'Contabilidad' : 'Compras',
+        quitar: async () => { if (!window.__rolesApi) return; const r = await window.__rolesApi.quitar(u.email); if (r.error) this.catAviso('No se pudo quitar: ' + r.error.message); else { this.catAviso('Permiso quitado a ' + u.email + '.', true); window.__rolesApi.cargar(); } } })),
       obras: Object.keys(st.obraDiv).sort().map(v => ({ v })),
       submit: () => this.submit(),
       hasFormMsg: !!st.formMsg, formMsg: st.formMsg,
@@ -660,17 +768,20 @@ ${v.isCaptura ? html`
 </div>
 <div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
 <label for="f-prov" class="lb">Proveedor</label>
-<input id="f-prov" class="in" list="dl-prov" value="${v.form.proveedor}" onInput="${v.onProv}" placeholder="Escribe o elige uno guardado" autocomplete="off" />
+<input id="f-prov" class="in" list="dl-prov" value="${v.form.proveedor}" onInput="${v.onProv}" placeholder="Elige un proveedor registrado" autocomplete="off" />
+${v.hasProvInfo ? html`<div style="${v.provInfoStyle}">${v.provInfo}</div>` : null}
 <datalist id="dl-prov">${(v.proveedores || []).map((p) => html`<option value="${p.v}"></option>`)}</datalist>
 </div>
 <div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
 <label for="f-obra" class="lb">Obra</label>
 <input id="f-obra" class="in" list="dl-obra" value="${v.form.obra}" onInput="${v.onObra}" placeholder="Vacío = Gastos generales CASYCO" autocomplete="off" />
+${v.hasObraInfo ? html`<div style="font-size: 12px; font-weight: 600; color: #9F1D12">${v.obraInfo}</div>` : null}
 <datalist id="dl-obra">${(v.obras || []).map((o) => html`<option value="${o.v}"></option>`)}</datalist>
 </div>
 <div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
-<label for="f-sol" class="lb">Solicita</label>
-<input id="f-sol" class="in" list="dl-sol" value="${v.form.solicita}" onInput="${v.onSol}" placeholder="FERNANDA" autocomplete="off" />
+<label for="f-sol" class="lb">Quién solicita</label>
+<input id="f-sol" class="in" list="dl-sol" value="${v.form.solicita}" onInput="${v.onSol}" placeholder="Elige un nombre registrado" autocomplete="off" />
+${v.hasSolInfo ? html`<div style="font-size: 12px; font-weight: 600; color: #9F1D12">${v.solInfo}</div>` : null}
 <datalist id="dl-sol">${(v.solicitantes || []).map((s) => html`<option value="${s.v}"></option>`)}</datalist>
 </div>
 <div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
@@ -776,12 +887,12 @@ ${(v.queue || []).map((r) => html`
 <td class="n" style="font-weight: 600">${r.montoTxt}</td>
 <td style="min-width: 160px"><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasNotas ? html`<div style="font-size: 12px; color: #33363C; margin-top: 4px">${r.notas}</div>` : null}
 <input class="in" aria-label="Nota de dirección" value="${r.notaDir}" onInput="${r.onNota}" placeholder="Nota de dirección" style="font-size: 12px; padding: 4px 8px; min-height: 30px; margin-top: 6px" /></td>
-<td><div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 230px">
+<td>${v.noAutoriza ? html`<span style="font-size: 12px; color: #5B5F68">En espera de dirección</span>` : null}${v.canAutorizar ? html`<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 230px">
 <button type="button" onClick="${r.onAut}" style="min-height: 34px; padding: 0 12px; border: none; border-radius: 5px; background: #1F6F43; color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer">Autorizar</button>
 <button type="button" onClick="${r.onRev}" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #B45309; color: #7A4A00">Rev. obra</button>
 <button type="button" onClick="${r.onSinPago}" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #6D28D9; color: #4C1D95">Sin pago</button>
 <button type="button" onClick="${r.onCancel}" aria-label="Cancelar OC" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #DDDBD4; color: #9F1D12">Cancelar</button>
-</div></td>
+</div>` : null}</td>
 </tr>
 `)}
 </tbody>
@@ -801,18 +912,18 @@ ${(v.porPagar || []).map((r) => html`
 <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
 <td>${r.obra}</td>
 <td>${r.division}</td>
-<td>${r.proveedor}</td>
+<td>${r.proveedor}<br /><span style="${r.provCuentaStyle}">${r.provCuenta}</span></td>
 <td class="n">${r.montoTxt}</td>
 <td style="white-space: nowrap"><span style="font-family: 'IBM Plex Mono', monospace">${r.faTxt}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.autoriza}</span></td>
 <td><span style="${r.alarmStyle}">${r.alarmTxt}</span></td>
-<td><select class="in" aria-label="Cuenta de pago" value="${r.bancoSel}" onChange="${r.onBanco}" style="min-width: 170px">
+<td>${v.canPagar ? html`<select class="in" aria-label="Cuenta de pago" value="${r.bancoSel}" onChange="${r.onBanco}" style="min-width: 170px">
 <option value="SANTANDER">SANTANDER</option>
 <option value="CUENTA PERSONAL">CTA. PERSONAL MANUEL</option>
 <option value="EFECTIVO">EFECTIVO</option>
 <option value="BANORTE">BANORTE</option>
-</select></td>
+</select>` : null}</td>
 <td style="white-space: nowrap; font-weight: 600">${r.pagaPreview}</td>
-<td><button type="button" onClick="${r.onPagar}" style="min-height: 44px; padding: 0 14px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap">Registrar pago</button><br /><button type="button" onClick="${r.onRegresar}" style="margin-top: 4px; min-height: 30px; border: none; background: transparent; color: #9F1D12; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; white-space: nowrap">Regresar a por autorizar</button></td>
+<td>${v.canPagar ? html`<button type="button" onClick="${r.onPagar}" style="min-height: 44px; padding: 0 14px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap">Registrar pago</button><br /><button type="button" onClick="${r.onRegresar}" style="margin-top: 4px; min-height: 30px; border: none; background: transparent; color: #9F1D12; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; white-space: nowrap">Regresar a por autorizar</button>` : null}</td>
 </tr>
 `)}
 </tbody>
@@ -983,6 +1094,7 @@ ${(o.qs || []).map((q) => html`
 ` : null}
 
 
+${v.sinRol ? html`<div role="alert" style="background: #FDF0D5; color: #7A4A00; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; font-size: 14px; font-weight: 600">Tu usuario todavía no tiene permisos asignados. Pide a Manuel que te dé de alta en Catálogos → Usuarios y permisos.</div>` : null}
 ${v.inReport ? html`
 <div class="noprint" style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 16px">
 <button type="button" onClick="${v.cerrarRep}" style="min-height: 44px; padding: 0 16px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">← Volver a la app</button>
@@ -1105,6 +1217,93 @@ ${v.isRepBanco ? html`
 <span>Montos con IVA · MXN</span>
 </div>
 </article>
+` : null}
+
+
+${v.isCatalogos ? html`
+${v.hasCatMsg ? html`<p role="status" style="${v.catMsgStyle}">${v.catMsg}</p>` : null}
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section style="flex: 999 1 640px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 4px; font-size: 18px">Proveedores</h2>
+<p style="margin: 0 0 16px; font-size: 14px; color: #5B5F68">Todos los datos son obligatorios. Sólo los proveedores registrados aquí se pueden usar al capturar una OC.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-com" class="lb">Nombre comercial</label><input id="p-com" class="in" value="${v.catProv.nombreComercial}" onInput="${v.onProvCom}" placeholder="FERKAMEX" /></div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-ben" class="lb">Beneficiario de la cuenta</label><input id="p-ben" class="in" value="${v.catProv.beneficiario}" onInput="${v.onProvBen}" placeholder="Nombre o razón social del titular" /></div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-clabe" class="lb">CLABE interbancaria (18 dígitos)</label><input id="p-clabe" class="in" inputMode="numeric" value="${v.catProv.clabe}" onInput="${v.onProvClabe}" placeholder="000000000000000000" style="font-family: 'IBM Plex Mono', monospace" /><span style="${v.clabeHintStyle}">${v.clabeHint}</span></div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px"><label for="p-banco" class="lb">Banco</label><input id="p-banco" class="in" value="${v.catProv.banco}" onInput="${v.onProvBanco}" placeholder="Se llena con la CLABE" /></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px">
+<button type="button" onClick="${v.guardarProv}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">${v.provBtnTxt}</button>
+${v.editandoProv ? html`<button type="button" onClick="${v.cancelarProv}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; min-height: 40px">Cancelar edición</button>` : null}
+</div>
+${v.hasProvSinDatos ? html`
+<div style="margin-top: 16px; background: #FDF0D5; color: #7A4A00; border-radius: 6px; padding: 10px 12px; font-size: 13px">
+<strong>Proveedores con OCs pero sin datos bancarios:</strong>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px">${(v.provSinDatos || []).map((p) => html`<button type="button" onClick="${p.completar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">${p.nombre} · completar</button>`)}</div>
+</div>
+` : null}
+<div style="margin-top: 16px; max-height: 50vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc">
+<thead><tr><th>Nombre comercial</th><th>Beneficiario</th><th>Banco · CLABE</th><th></th></tr></thead>
+<tbody>
+${(v.provLista || []).map((p) => html`
+<tr><td style="font-weight: 600">${p.nombreComercial}</td><td>${p.beneficiario}</td><td><span>${p.banco}</span><br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.clabeFmt}</span></td>
+<td style="white-space: nowrap"><button type="button" onClick="${p.editar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Editar</button>${v.canBorrarCat ? html` <button type="button" onClick="${p.borrar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Borrar</button>` : null}</td></tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+
+<div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 12px; font-size: 18px">Obras</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="o-nom" class="lb">Nombre de la obra</label><input id="o-nom" class="in" value="${v.catObra.nombre}" onInput="${v.onObraNom}" placeholder="TORRE NORTE" /></div>
+<div style="flex: 0 1 150px; display: flex; flex-direction: column; gap: 6px"><label for="o-div" class="lb">División</label><select id="o-div" class="in" value="${v.catObra.division}" onChange="${v.onObraDiv}"><option value="HOTELERIA">HOTELERÍA</option><option value="INDUSTRIAL">INDUSTRIAL</option></select></div>
+<button type="button" onClick="${v.guardarObra}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Agregar obra</button>
+</div>
+<div style="margin-top: 14px; max-height: 36vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Obra</th><th>División</th></tr></thead><tbody>
+${(v.obraLista || []).map((o) => html`<tr><td style="font-weight: 600">${o.nombre}</td><td>${o.division}</td></tr>`)}
+</tbody></table>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 12px; font-size: 18px">Quién solicita</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="s-nom" class="lb">Nombre</label><input id="s-nom" class="in" value="${v.catSol.nombre}" onInput="${v.onSolNom}" placeholder="ING. ERICK" /></div>
+<div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px"><label for="s-pue" class="lb">Puesto u obra (opcional)</label><input id="s-pue" class="in" value="${v.catSol.puesto}" onInput="${v.onSolPue}" placeholder="Residente SMA" /></div>
+<button type="button" onClick="${v.guardarSol}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Agregar</button>
+</div>
+<div style="margin-top: 14px; max-height: 36vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Nombre</th><th>Puesto u obra</th><th></th></tr></thead><tbody>
+${(v.solLista || []).map((p) => html`<tr><td style="font-weight: 600">${p.nombre}</td><td>${p.puesto}</td><td>${v.canBorrarCat ? html`<button type="button" onClick="${p.borrar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Borrar</button>` : null}</td></tr>`)}
+</tbody></table>
+</div>
+</section>
+
+${v.esDireccion ? html`
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 4px; font-size: 18px">Usuarios y permisos</h2>
+<p style="margin: 0 0 12px; font-size: 13px; color: #5B5F68">Compras ve Captura, Filtro (sólo consulta) y Catálogos. Contabilidad ve todo y registra pagos y depósitos. Dirección además autoriza. El usuario y contraseña se crean en Supabase → Authentication.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px"><label for="u-mail" class="lb">Correo</label><input id="u-mail" class="in" type="email" value="${v.rolForm.email}" onInput="${v.onRolMail}" placeholder="julieta@casyco.com" /></div>
+<div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px"><label for="u-nom" class="lb">Nombre</label><input id="u-nom" class="in" value="${v.rolForm.nombre}" onInput="${v.onRolNom}" placeholder="Julieta" /></div>
+<div style="flex: 0 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="u-rol" class="lb">Permiso</label><select id="u-rol" class="in" value="${v.rolForm.rol}" onChange="${v.onRolRol}"><option value="compras">Compras</option><option value="contabilidad">Contabilidad</option><option value="direccion">Dirección</option></select></div>
+<button type="button" onClick="${v.guardarRol}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Guardar</button>
+</div>
+<div style="margin-top: 14px; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Correo</th><th>Nombre</th><th>Permiso</th><th></th></tr></thead><tbody>
+${(v.rolesLista || []).map((u) => html`<tr><td style="overflow-wrap: anywhere">${u.email}</td><td>${u.nombre}</td><td style="font-weight: 600">${u.rolTxt}</td><td><button type="button" onClick="${u.quitar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Quitar</button></td></tr>`)}
+</tbody></table>
+</div>
+</section>
+` : null}
+</div>
+</div>
 ` : null}
 
 
@@ -1386,15 +1585,17 @@ const dbAdapter = {
 
 const uniq = (arr) => Array.from(new Set(arr.filter(Boolean))).sort();
 function __aplicar(c) {
-  const rows = [], deposits = [], persHist = []; let obras = null;
+  const rows = [], deposits = [], persHist = [], proveedoresCat = [], solicitantesCat = []; let obras = null;
   Object.keys(__cache).forEach(k => {
     const [col, id] = __split(k), d = __cache[k];
     if (col === 'ocs') rows.push(Object.assign({}, d, { id }));
     else if (col === 'depositos') deposits.push(Object.assign({}, d, { id }));
     else if (col === 'personal') persHist.push(Object.assign({}, d, { hid: id }));
+    else if (col === 'proveedores') proveedoresCat.push(Object.assign({}, d, { id }));
+    else if (col === 'solicitantes') solicitantesCat.push(Object.assign({}, d, { id }));
     else if (col === 'config' && id === 'obras') obras = d.map || {};
   });
-  const patch = { rows, deposits, persHist, proveedores: uniq(rows.map(r => r.proveedor)), solicitantes: uniq(rows.map(r => r.solicita)) };
+  const patch = { rows, deposits, persHist, proveedoresCat, solicitantesCat, proveedores: uniq(rows.map(r => r.proveedor)), solicitantes: uniq(rows.map(r => r.solicita)) };
   if (obras) patch.obraDiv = Object.assign({}, c.state.obraDiv, obras);
   c.setState(patch);
 }
@@ -1430,6 +1631,11 @@ document.getElementById('login-form').addEventListener('submit', async (ev) => {
   if (error) verLogin('Correo o contraseña incorrectos. Revisa los datos o pide tu acceso a Manuel.');
 });
 window.__salir = async () => { await sb.auth.signOut(); };
+window.__rolesApi = {
+  cargar: async () => { const r = await sb.from('roles').select('email,nombre,rol').order('email'); if (!r.error && __inst) __inst.setState({ rolesList: r.data || [] }); return r; },
+  guardar: (u) => sb.from('roles').upsert(u),
+  quitar: (email) => sb.from('roles').delete().eq('email', email)
+};
 
 let __arrancada = false;
 async function arrancar(session) {
@@ -1437,6 +1643,11 @@ async function arrancar(session) {
   if (!__inst) { __inst = new Component({}); }
   __inst.db = dbAdapter;
   __inst.setState({ userEmail: session.user.email || '' });
+  const rr = await sb.rpc('mi_rol');
+  // Si la función de permisos aún no existe en la base (antes de correr el SQL 02), se conserva el acceso completo.
+  const sinFuncion = rr && rr.error && (rr.error.code === 'PGRST202' || /mi_rol/i.test(rr.error.message || ''));
+  __inst.setState({ rol: sinFuncion ? 'direccion' : ((rr && !rr.error && rr.data) ? rr.data : '') });
+  if (rr && rr.data === 'direccion') window.__rolesApi.cargar();
   __render();
   if (!__arrancada) { __arrancada = true; await __cargarDatos(__inst); }
 }
