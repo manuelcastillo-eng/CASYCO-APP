@@ -112,7 +112,7 @@ class Component extends DCLogic {
       reviewer: 'LMCM',
       buscar: '', filtroVista: 'autorizar', flash: '', flashPagar: false, undo: null,
       rol: '', userEmail: '', proveedoresCat: [], solicitantesCat: [], rolesList: [],
-      catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' }, catObra: { nombre: '', division: 'HOTELERIA' }, catSol: { nombre: '', puesto: '' },
+      catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' }, provFiltro: 'TODOS', provBuscar: '', editId: '', catObra: { nombre: '', division: 'HOTELERIA' }, catSol: { nombre: '', puesto: '' },
       rolForm: { email: '', nombre: '', rol: 'compras' }, catMsg: '', catOk: true,
       payBank: {},
       finFilter: 'TODOS',
@@ -210,18 +210,28 @@ class Component extends DCLogic {
     });
   }
   catAviso(msg, ok) { this.setState({ catMsg: msg, catOk: !!ok }); }
+  rfcOk(r) { return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(r); }
+  provFaltan(p) {
+    const f = [];
+    if (!p.beneficiario) f.push('razón social');
+    if (!p.rfc) f.push('RFC'); else if (!this.rfcOk(p.rfc)) f.push('RFC inválido');
+    if (!p.clabe) f.push('CLABE'); else if (!this.clabeOk(p.clabe)) f.push(/^\d{16}$/.test(p.clabe) ? 'CLABE (es tarjeta)' : 'CLABE inválida');
+    if (!p.banco) f.push('banco');
+    return f;
+  }
+  provBuscarNombre(n) { return n ? (this._provMap || {})[String(n).trim().toUpperCase()] : null; }
   guardarProv() {
     const s = this.state, p = s.catProv;
-    const nombreComercial = p.nombreComercial.trim().toUpperCase(), beneficiario = p.beneficiario.trim().toUpperCase(), banco = p.banco.trim().toUpperCase(), clabe = p.clabe.trim();
-    const falta = []; if (!nombreComercial) falta.push('nombre comercial'); if (!beneficiario) falta.push('beneficiario'); if (!clabe) falta.push('CLABE'); if (!banco) falta.push('banco');
-    if (falta.length) return this.catAviso('Falta: ' + falta.join(', ') + '.');
-    if (!this.clabeOk(clabe)) return this.catAviso('La CLABE no es válida: deben ser 18 dígitos y el último es de control. Revísala con el estado de cuenta del proveedor.');
+    const nombreComercial = p.nombreComercial.trim().toUpperCase(), beneficiario = p.beneficiario.trim().toUpperCase(), rfc = (p.rfc || '').trim().toUpperCase().replace(/\s/g, ''), banco = p.banco.trim().toUpperCase(), clabe = p.clabe.trim();
+    if (!nombreComercial) return this.catAviso('Escribe al menos el nombre comercial del proveedor.');
     const id = p.id || this.slug(nombreComercial);
     if (!p.id && s.proveedoresCat.some(x => x.id === id)) return this.catAviso('Ya existe un proveedor con ese nombre comercial. Usa «Editar» para cambiar sus datos.');
-    const data = { nombreComercial, beneficiario, banco, clabe, actualizo: s.userEmail || '' };
-    this.setState({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== id).concat([Object.assign({ id }, data)]), catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' } });
+    const prev = s.proveedoresCat.find(x => x.id === id) || {};
+    const data = Object.assign({}, prev, { nombreComercial, beneficiario, rfc, banco, clabe, actualizo: s.userEmail || '' }); delete data.id;
+    this.setState({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== id).concat([Object.assign({ id }, data)]), catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' } });
     if (this.db) this.db.doc('proveedores/' + id).set(data).catch(e => this.dbErr(e));
-    this.catAviso('Proveedor ' + nombreComercial + ' guardado.', true);
+    const faltan = this.provFaltan(data);
+    this.catAviso('Proveedor ' + nombreComercial + ' guardado' + (faltan.length ? ' como INCOMPLETO (falta: ' + faltan.join(', ') + ').' : ' con datos completos.'), true);
   }
   guardarObra() {
     const s = this.state, nombre = s.catObra.nombre.trim().toUpperCase();
@@ -297,8 +307,11 @@ class Component extends DCLogic {
       esDevuelto: !!r.devuelto, devTxt: r.devuelto ? 'Devuelto ' + this.fd(r.devuelto) : '',
       diasDev: r.fechaPago ? Math.max(0, this.dias(r.fechaPago, hoy)) : 0,
       puedeActuar: this.state.rol === 'direccion' && ['PENDIENTE', 'REVISION', 'SIN_PAGO_CLIENTE', 'CANCELADO'].indexOf(b) >= 0,
-      provCuenta: (this._provMap && this._provMap[r.proveedor]) ? (this._provMap[r.proveedor].banco + ' · CLABE ' + this._provMap[r.proveedor].clabe) : 'Sin datos bancarios en catálogo',
-      provCuentaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:' + ((this._provMap && this._provMap[r.proveedor]) ? '#33363C' : '#9F1D12'),
+      provCuenta: (() => { const p = this.provBuscarNombre(r.proveedor); if (!p) return 'No registrado en catálogo'; const f = this.provFaltan(p); return (p.banco || 'Sin banco') + ' · CLABE ' + (p.clabe || '—') + (f.length ? ' · Incompleto: ' + f.join(', ') : ''); })(),
+      provCuentaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:' + ((() => { const p = this.provBuscarNombre(r.proveedor); return p && !this.provFaltan(p).length; })() ? '#33363C' : '#9F1D12'),
+      hasEdit: !!(r.editada && r.editada.length), editTxt: (r.editada && r.editada.length) ? (r.editada[r.editada.length - 1].cambios + ' · ' + this.fd(r.editada[r.editada.length - 1].fecha)) : '',
+      puedeEditar: !r.fechaPago && r.estatus !== 'CANCELADO' && !!this.state.rol,
+      onEditar: () => { this.setState({ editId: id, tab: 'captura', formMsg: '', form: { oc: r.oc, monto: String(r.monto), proveedor: r.proveedor, obra: r.obra, division: r.division, solicita: r.solicita, notas: r.notas || '' } }); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} },
       puedeRegresar: b !== 'PENDIENTE', regresarTxt: b === 'CANCELADO' ? 'Reactivar a por autorizar' : 'Regresar a por autorizar',
       onRegresar: () => { this.upd(id, { estatus: 'PENDIENTE', fechaAut: '' }); this.setState({ flash: r.oc + ' regresó a «Por autorizar».', flashPagar: false, undo: null }); },
       onDevolver: () => this.upd(id, { devuelto: hoyS }),
@@ -307,6 +320,7 @@ class Component extends DCLogic {
   }
 
   submit() {
+    if (this.state.editId) return this.guardarEdicion();
     const s = this.state, f = s.form;
     const oc = f.oc.trim().toUpperCase(), prov = f.proveedor.trim().toUpperCase(), sol = f.solicita.trim().toUpperCase();
     const obra = f.obra.trim().toUpperCase() || 'GASTOS GENERALES CASYCO';
@@ -315,11 +329,12 @@ class Component extends DCLogic {
     if (!oc) falta.push('OC'); if (!monto) falta.push('monto'); if (!prov) falta.push('proveedor'); if (!sol) falta.push('quién solicita');
     if (falta.length) { this.setState({ formMsg: 'Falta: ' + falta.join(', ') + '.', formOk: false }); return; }
     if (s.rows.some(r => r.oc === oc && r.estatus !== 'CANCELADO')) { this.setState({ formMsg: 'La OC ' + oc + ' ya está en el filtro.', formOk: false }); return; }
-    if (!s.proveedoresCat.some(p => p.nombreComercial === prov)) { this.setState({ formMsg: 'El proveedor ' + prov + ' no está registrado. Regístralo en Catálogos con su CLABE, banco y beneficiario.', formOk: false }); return; }
+    const provCat = this.provBuscarNombre(prov);
+    if (!provCat) { this.setState({ formMsg: 'El proveedor ' + prov + ' no está registrado. Regístralo en Catálogos (nombre comercial, razón social, RFC, CLABE y banco).', formOk: false }); return; }
     if (!s.obraDiv[obra]) { this.setState({ formMsg: 'La obra ' + obra + ' no está registrada. Agrégala en Catálogos.', formOk: false }); return; }
     if (!s.solicitantesCat.some(p => p.nombre === sol)) { this.setState({ formMsg: sol + ' no está registrado en «Quién solicita». Agrégalo en Catálogos.', formOk: false }); return; }
     let id = oc.replace(/[^A-Za-z0-9_\-.~:@+]/g, '_'); if (!id || id === '.' || id === '..') id = 'oc'; if (s.rows.some(r => r.id === id)) id = id + '_' + Date.now();
-    const row = { id, oc, monto, proveedor: prov, obra, solicita: sol, notas: f.notas.trim(), estatus: 'PENDIENTE', division: f.division, fechaCaptura: this.hoy(), fechaAut: '', banco: '', fechaPago: '', notaDir: '', capturo: s.userEmail || '' };
+    const row = { id, oc, monto, proveedor: provCat.nombreComercial, obra, solicita: sol, notas: f.notas.trim(), estatus: 'PENDIENTE', division: f.division, fechaCaptura: this.hoy(), fechaAut: '', banco: '', fechaPago: '', notaDir: '', capturo: s.userEmail || '' };
     if (this.db) { const body = Object.assign({}, row); delete body.id; this.db.doc('ocs/' + id).set(body).catch(e => this.dbErr(e)); }
     if (s.obraDiv[obra] !== f.division) this.saveObras(Object.assign({}, s.obraDiv, { [obra]: f.division }));
     const add = (arr, v) => arr.indexOf(v) >= 0 ? arr : arr.concat([v]).sort();
@@ -333,13 +348,42 @@ class Component extends DCLogic {
     });
   }
 
+  guardarEdicion() {
+    const s = this.state, f = s.form, id = s.editId;
+    const r = s.rows.find(x => x.id === id);
+    if (!r) { this.setState({ editId: '', formMsg: 'No se encontró la OC a editar.', formOk: false }); return; }
+    if (r.fechaPago) { this.setState({ formMsg: 'La OC ' + r.oc + ' ya está pagada; no se puede editar.', formOk: false }); return; }
+    const oc = f.oc.trim().toUpperCase(), sol = f.solicita.trim().toUpperCase();
+    const obra = f.obra.trim().toUpperCase() || 'GASTOS GENERALES CASYCO';
+    const monto = this.num(f.monto);
+    const falta = [];
+    if (!oc) falta.push('OC'); if (!monto) falta.push('monto'); if (!f.proveedor.trim()) falta.push('proveedor'); if (!sol) falta.push('quién solicita');
+    if (falta.length) { this.setState({ formMsg: 'Falta: ' + falta.join(', ') + '.', formOk: false }); return; }
+    if (s.rows.some(x => x.id !== id && x.oc === oc && x.estatus !== 'CANCELADO')) { this.setState({ formMsg: 'Ya existe otra OC con el número ' + oc + '.', formOk: false }); return; }
+    const provCat = this.provBuscarNombre(f.proveedor);
+    const mismoProv = !provCat && f.proveedor.trim().toUpperCase() === r.proveedor;
+    if (!provCat && !mismoProv) { this.setState({ formMsg: 'El proveedor ' + f.proveedor.trim().toUpperCase() + ' no está registrado. Regístralo en Catálogos.', formOk: false }); return; }
+    if (!s.obraDiv[obra]) { this.setState({ formMsg: 'La obra ' + obra + ' no está registrada. Agrégala en Catálogos.', formOk: false }); return; }
+    if (!s.solicitantesCat.some(p => p.nombre === sol)) { this.setState({ formMsg: sol + ' no está registrado en «Quién solicita». Agrégalo en Catálogos.', formOk: false }); return; }
+    const nuevo = { oc, monto, proveedor: provCat ? provCat.nombreComercial : r.proveedor, obra, division: f.division, solicita: sol, notas: f.notas.trim() };
+    const etiquetas = { oc: 'OC', monto: 'Monto', proveedor: 'Proveedor', obra: 'Obra', division: 'División', solicita: 'Solicita', notas: 'Observaciones' };
+    const cambios = Object.keys(nuevo).filter(k => String(r[k] == null ? '' : r[k]) !== String(nuevo[k])).map(k =>
+      etiquetas[k] + ' ' + (k === 'monto' ? this.money(r.monto) + ' → ' + this.money(monto) : (r[k] || '—') + ' → ' + (nuevo[k] || '—')));
+    if (!cambios.length) { this.setState({ formMsg: 'No hiciste cambios en la OC ' + r.oc + '.', formOk: false }); return; }
+    const patch = Object.assign({}, nuevo, { editada: (r.editada || []).concat([{ fecha: this.hoy(), por: s.userEmail || '', cambios: cambios.join('; ') }]) });
+    let extra = '';
+    if (r.estatus === 'AUTORIZADO' && monto !== r.monto) { patch.estatus = 'PENDIENTE'; patch.fechaAut = ''; extra = ' Como cambió el monto, regresó a «Por autorizar».'; }
+    this.upd(id, patch);
+    this.setState({ editId: '', form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: f.solicita, notas: '' }, formMsg: 'OC ' + oc + ' actualizada: ' + cambios.join('; ') + '.' + extra, formOk: true });
+  }
+
   renderVals() {
     const rol = this.state.rol || '';
     const esDir = rol === 'direccion', esConta = rol === 'contabilidad', esCompras = !esDir && !esConta;
     const permitidas = esCompras ? ['captura', 'filtro', 'catalogos'] : null;
     const st = (permitidas && permitidas.indexOf(this.state.tab) < 0) ? Object.assign({}, this.state, { tab: 'captura', report: null }) : this.state;
     const hoy = this.hoy();
-    this._provMap = {}; (st.proveedoresCat || []).forEach(p => { this._provMap[p.nombreComercial] = p; });
+    this._provMap = {}; (st.proveedoresCat || []).forEach(p => { [p.beneficiario].concat(p.alias || []).forEach(k => { if (k) this._provMap[String(k).toUpperCase()] = p; }); }); (st.proveedoresCat || []).forEach(p => { this._provMap[p.nombreComercial] = p; });
     const dA = this.props.diasAlerta ?? 2, dC = this.props.diasCritico ?? 4;
     const rows = st.rows.map(r => this.decorate(r, hoy, dA, dC));
     const B = ['PAGADO', 'POR_PAGAR', 'REVISION', 'SIN_PAGO_CLIENTE', 'PENDIENTE'];
@@ -669,8 +713,17 @@ class Component extends DCLogic {
       proveedores: (st.proveedoresCat || []).map(p => ({ v: p.nombreComercial })).sort((a, b) => a.v.localeCompare(b.v)),
       solicitantes: (st.solicitantesCat || []).map(p => ({ v: p.nombre })).sort((a, b) => a.v.localeCompare(b.v)),
       hasProvInfo: !!f.proveedor.trim(),
-      provInfo: (() => { const p = this._provMap[f.proveedor.trim().toUpperCase()]; return p ? (p.banco + ' · CLABE ' + p.clabe + ' · ' + p.beneficiario) : 'No está registrado. Regístralo en Catálogos con su CLABE antes de enviar la OC.'; })(),
-      provInfoStyle: 'font-size:12px;font-weight:600;color:' + (this._provMap[f.proveedor.trim().toUpperCase()] ? '#14532D' : '#9F1D12'),
+      provInfo: (() => { const p = this.provBuscarNombre(f.proveedor); if (!p) return 'No está registrado. Regístralo en Catálogos antes de enviar la OC.'; const fl = this.provFaltan(p); return (p.nombreComercial !== f.proveedor.trim().toUpperCase() ? p.nombreComercial + ' · ' : '') + (p.banco || 'sin banco') + ' · CLABE ' + (p.clabe || '—') + ' · ' + (p.beneficiario || 'sin razón social') + (fl.length ? ' · INCOMPLETO: falta ' + fl.join(', ') : ''); })(),
+      provInfoStyle: 'font-size:12px;font-weight:600;color:' + ((() => { const p = this.provBuscarNombre(f.proveedor); return !p ? '#9F1D12' : (this.provFaltan(p).length ? '#7A4A00' : '#14532D'); })()),
+      editandoOC: !!st.editId, formTitulo: st.editId ? 'Editando OC ' + ((st.rows.find(x => x.id === st.editId) || {}).oc || '') : 'Enviar OC al filtro',
+      submitTxt: st.editId ? 'Guardar cambios de la OC' : 'Enviar al filtro de dirección',
+      cancelarEdicion: () => this.setState({ editId: '', formMsg: '', form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: st.form.solicita, notas: '' } }),
+      onProvRfc: (e) => this.setCat('catProv', 'rfc', e.target.value.toUpperCase()),
+      rfcHint: !st.catProv.rfc ? 'Opcional, pero sin RFC queda incompleto.' : (this.rfcOk(st.catProv.rfc.trim()) ? 'RFC con formato válido' : 'Formato de RFC no válido'),
+      rfcHintStyle: 'font-size:12px;font-weight:600;color:' + (!st.catProv.rfc ? '#5B5F68' : (this.rfcOk(st.catProv.rfc.trim()) ? '#14532D' : '#9F1D12')),
+      provBuscar: st.provBuscar, onProvBuscar: (e) => this.setState({ provBuscar: e.target.value }),
+      provFiltros: [['TODOS', 'Todos'], ['COMPLETOS', 'Completos'], ['INCOMPLETOS', 'Incompletos']].map(c => ({ label: c[1], n: (st.proveedoresCat || []).filter(p => c[0] === 'TODOS' || (c[0] === 'COMPLETOS') === !this.provFaltan(p).length).length,
+        go: () => this.setState({ provFiltro: c[0] }), style: 'min-height:40px;padding:0 14px;border-radius:20px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;' + (st.provFiltro === c[0] ? 'background:#15171C;color:#FFFFFF;border:1px solid #15171C' : 'background:#FFFFFF;color:#15171C;border:1px solid #B9B7AF') })),
       hasObraInfo: !!f.obra.trim() && !st.obraDiv[f.obra.trim().toUpperCase()], obraInfo: 'Obra no registrada. Agrégala en Catálogos.',
       hasSolInfo: !!f.solicita.trim() && !(st.solicitantesCat || []).some(p => p.nombre === f.solicita.trim().toUpperCase()), solInfo: 'Nombre no registrado. Agrégalo en Catálogos.',
       canAutorizar: esDir, noAutoriza: !esDir, canPagar: esDir || esConta, esDireccion: esDir, canBorrarCat: esDir || esConta,
@@ -681,16 +734,21 @@ class Component extends DCLogic {
       catProv: st.catProv, catObra: st.catObra, catSol: st.catSol, rolForm: st.rolForm,
       onProvCom: (e) => this.setCat('catProv', 'nombreComercial', e.target.value), onProvBen: (e) => this.setCat('catProv', 'beneficiario', e.target.value),
       onProvClabe: (e) => this.setCat('catProv', 'clabe', e.target.value), onProvBanco: (e) => this.setCat('catProv', 'banco', e.target.value),
-      clabeHint: !st.catProv.clabe ? 'La encuentras en el estado de cuenta o la carátula del proveedor.' : (st.catProv.clabe.length < 18 ? st.catProv.clabe.length + ' de 18 dígitos' : (this.clabeOk(st.catProv.clabe) ? 'CLABE válida' : 'CLABE no válida: revisa los dígitos')),
+      clabeHint: !st.catProv.clabe ? 'Opcional, pero sin CLABE queda incompleto.' : (st.catProv.clabe.length < 18 ? st.catProv.clabe.length + ' de 18 dígitos' : (this.clabeOk(st.catProv.clabe) ? 'CLABE válida' : 'CLABE no válida: revisa los dígitos')),
       clabeHintStyle: 'font-size:12px;font-weight:600;color:' + (!st.catProv.clabe || st.catProv.clabe.length < 18 ? '#5B5F68' : (this.clabeOk(st.catProv.clabe) ? '#14532D' : '#9F1D12')),
       guardarProv: () => this.guardarProv(), provBtnTxt: st.catProv.id ? 'Guardar cambios' : 'Registrar proveedor', editandoProv: !!st.catProv.id,
-      cancelarProv: () => this.setState({ catProv: { id: '', nombreComercial: '', beneficiario: '', banco: '', clabe: '' }, catMsg: '' }),
-      provLista: (st.proveedoresCat || []).slice().sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial)).map(p => ({
+      cancelarProv: () => this.setState({ catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' }, catMsg: '' }),
+      provLista: (st.proveedoresCat || []).filter(p => { const inc = this.provFaltan(p).length > 0; if (st.provFiltro === 'COMPLETOS' && inc) return false; if (st.provFiltro === 'INCOMPLETOS' && !inc) return false;
+        const q = (st.provBuscar || '').trim().toUpperCase(); return !q || [p.nombreComercial, p.beneficiario, p.rfc].concat(p.alias || []).join(' ').toUpperCase().indexOf(q) >= 0; })
+        .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial)).map(p => ({
+        rfc: p.rfc || 'Sin RFC', hasAlias: !!(p.alias && p.alias.length), aliasTxt: (p.alias || []).join(', '),
+        estadoTxt: this.provFaltan(p).length ? 'Incompleto: ' + this.provFaltan(p).join(', ') : 'Completo',
+        estadoStyle: 'display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;' + (this.provFaltan(p).length ? 'background:#FDF0D5;color:#7A4A00' : 'background:#DCEFE4;color:#14532D'),
         nombreComercial: p.nombreComercial, beneficiario: p.beneficiario, banco: p.banco, clabeFmt: String(p.clabe || '').replace(/(\d{3})(\d{3})(\d{11})(\d)/, '$1 $2 $3 $4'),
-        editar: () => this.setState({ catProv: { id: p.id, nombreComercial: p.nombreComercial, beneficiario: p.beneficiario, banco: p.banco, clabe: p.clabe }, catMsg: '' }),
+        editar: () => { this.setState({ catProv: { id: p.id, nombreComercial: p.nombreComercial, beneficiario: p.beneficiario || '', rfc: p.rfc || '', banco: p.banco || '', clabe: p.clabe || '' }, catMsg: '' }); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} },
         borrar: () => { this.setState(s => ({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== p.id) })); if (this.db) this.db.doc('proveedores/' + p.id).delete().catch(e => this.dbErr(e)); this.catAviso('Proveedor ' + p.nombreComercial + ' borrado.', true); }
       })),
-      provSinDatos: Array.from(new Set(st.rows.map(r => r.proveedor))).filter(n => n && !this._provMap[n]).sort().map(n => ({ nombre: n, completar: () => this.setState({ catProv: { id: '', nombreComercial: n, beneficiario: '', banco: '', clabe: '' }, catMsg: '' }) })),
+      provSinDatos: Array.from(new Set(st.rows.map(r => r.proveedor))).filter(n => n && !this._provMap[n]).sort().map(n => ({ nombre: n, completar: () => this.setState({ catProv: { id: '', nombreComercial: n, beneficiario: '', rfc: '', banco: '', clabe: '' }, catMsg: '' }) })),
       hasProvSinDatos: st.rows.some(r => r.proveedor && !this._provMap[r.proveedor]),
       onObraNom: (e) => this.setCat('catObra', 'nombre', e.target.value), onObraDiv: (e) => this.setCat('catObra', 'division', e.target.value), guardarObra: () => this.guardarObra(),
       obraLista: Object.keys(st.obraDiv).sort().map(k => ({ nombre: k, division: st.obraDiv[k] === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería' })),
@@ -755,7 +813,7 @@ ${v.hasDbMsg ? html`<div role="alert" style="background: #FBE0DC; color: #9F1D12
 ${v.isCaptura ? html`
 <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
 <section style="flex: 1 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 24px">
-<h2 style="margin: 0 0 4px; font-size: 18px">Enviar OC al filtro</h2>
+<h2 style="margin: 0 0 4px; font-size: 18px">${v.formTitulo}</h2>
 <p style="margin: 0 0 20px; font-size: 14px; color: #5B5F68">Compras llena sólo esta sección. División, quién autoriza, fecha, alarmas, pago y reportes se llenan solos.</p>
 <div style="display: flex; flex-wrap: wrap; gap: 16px">
 <div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
@@ -801,7 +859,8 @@ ${v.hasSolInfo ? html`<div style="font-size: 12px; font-weight: 600; color: #9F1
 ${v.hasFormMsg ? html`
 <p role="status" style="${v.formMsgStyle}">${v.formMsg}</p>
 ` : null}
-<button type="button" onClick="${v.submit}" style="margin-top: 18px; width: 100%; min-height: 48px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Enviar al filtro de dirección</button>
+<button type="button" onClick="${v.submit}" style="margin-top: 18px; width: 100%; min-height: 48px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">${v.submitTxt}</button>
+${v.editandoOC ? html`<button type="button" onClick="${v.cancelarEdicion}" style="margin-top: 8px; width: 100%; min-height: 44px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Cancelar edición</button>` : null}
 </section>
 
 <section style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 24px">
@@ -811,7 +870,7 @@ ${v.hasFormMsg ? html`
 </div>
 <div style="max-height: 640px; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
 <table class="t tc">
-<thead><tr><th>Fecha</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th>Estatus</th></tr></thead>
+<thead><tr><th>Fecha</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th>Estatus</th><th></th></tr></thead>
 <tbody>
 ${(v.recent || []).map((r) => html`
 <tr>
@@ -819,7 +878,8 @@ ${(v.recent || []).map((r) => html`
 <td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
 <td style="overflow-wrap: anywhere"><span style="font-weight: 600">${r.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.proveedor} · ${r.solicita}</span></td>
 <td class="n">${r.montoTxt}</td>
-<td><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasAlarm ? html`<br /><span style="${r.alarmStyle}; margin-top: 4px">${r.alarmTxt}</span>` : null}</td>
+<td><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasAlarm ? html`<br /><span style="${r.alarmStyle}; margin-top: 4px">${r.alarmTxt}</span>` : null}${r.hasEdit ? html`<div style="margin-top: 4px"><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #FDF0D5; color: #7A4A00">Editada</span> <span style="font-size: 11px; color: #5B5F68">${r.editTxt}</span></div>` : null}</td>
+<td>${r.puedeEditar ? html`<button type="button" onClick="${r.onEditar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Editar</button>` : null}</td>
 </tr>
 `)}
 </tbody>
@@ -885,7 +945,7 @@ ${(v.queue || []).map((r) => html`
 <td style="white-space: nowrap"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${r.oc}</span> <span style="font-size: 11px; color: #5B5F68">${r.fcCorto}</span><br /><span style="${r.alarmStyle}; margin-top: 4px">${r.alarmTxt}</span></td>
 <td style="overflow-wrap: anywhere"><span style="font-weight: 600">${r.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.proveedor} · ${r.solicita}</span></td>
 <td class="n" style="font-weight: 600">${r.montoTxt}</td>
-<td style="min-width: 160px"><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasNotas ? html`<div style="font-size: 12px; color: #33363C; margin-top: 4px">${r.notas}</div>` : null}
+<td style="min-width: 160px"><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasEdit ? html`<div style="margin-top: 4px"><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #FDF0D5; color: #7A4A00">Editada</span> <span style="font-size: 11px; color: #5B5F68">${r.editTxt}</span></div>` : null}${r.hasNotas ? html`<div style="font-size: 12px; color: #33363C; margin-top: 4px">${r.notas}</div>` : null}
 <input class="in" aria-label="Nota de dirección" value="${r.notaDir}" onInput="${r.onNota}" placeholder="Nota de dirección" style="font-size: 12px; padding: 4px 8px; min-height: 30px; margin-top: 6px" /></td>
 <td>${v.noAutoriza ? html`<span style="font-size: 12px; color: #5B5F68">En espera de dirección</span>` : null}${v.canAutorizar ? html`<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 230px">
 <button type="button" onClick="${r.onAut}" style="min-height: 34px; padding: 0 12px; border: none; border-radius: 5px; background: #1F6F43; color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer">Autorizar</button>
@@ -1226,10 +1286,11 @@ ${v.hasCatMsg ? html`<p role="status" style="${v.catMsgStyle}">${v.catMsg}</p>` 
 
 <section style="flex: 999 1 640px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
 <h2 style="margin: 0 0 4px; font-size: 18px">Proveedores</h2>
-<p style="margin: 0 0 16px; font-size: 14px; color: #5B5F68">Todos los datos son obligatorios. Sólo los proveedores registrados aquí se pueden usar al capturar una OC.</p>
+<p style="margin: 0 0 16px; font-size: 14px; color: #5B5F68">Sólo el nombre comercial es obligatorio. Si falta razón social, RFC, CLABE o banco, el proveedor queda marcado como <strong>incompleto</strong> hasta que se completen sus datos.</p>
 <div style="display: flex; flex-wrap: wrap; gap: 12px">
 <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-com" class="lb">Nombre comercial</label><input id="p-com" class="in" value="${v.catProv.nombreComercial}" onInput="${v.onProvCom}" placeholder="FERKAMEX" /></div>
-<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-ben" class="lb">Beneficiario de la cuenta</label><input id="p-ben" class="in" value="${v.catProv.beneficiario}" onInput="${v.onProvBen}" placeholder="Nombre o razón social del titular" /></div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-ben" class="lb">Razón social (beneficiario)</label><input id="p-ben" class="in" value="${v.catProv.beneficiario}" onInput="${v.onProvBen}" placeholder="Titular de la cuenta" /></div>
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="p-rfc" class="lb">RFC</label><input id="p-rfc" class="in" value="${v.catProv.rfc}" onInput="${v.onProvRfc}" placeholder="ABC123456XY9" style="font-family: 'IBM Plex Mono', monospace; text-transform: uppercase" /><span style="${v.rfcHintStyle}">${v.rfcHint}</span></div>
 <div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-clabe" class="lb">CLABE interbancaria (18 dígitos)</label><input id="p-clabe" class="in" inputMode="numeric" value="${v.catProv.clabe}" onInput="${v.onProvClabe}" placeholder="000000000000000000" style="font-family: 'IBM Plex Mono', monospace" /><span style="${v.clabeHintStyle}">${v.clabeHint}</span></div>
 <div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px"><label for="p-banco" class="lb">Banco</label><input id="p-banco" class="in" value="${v.catProv.banco}" onInput="${v.onProvBanco}" placeholder="Se llena con la CLABE" /></div>
 </div>
@@ -1239,16 +1300,20 @@ ${v.editandoProv ? html`<button type="button" onClick="${v.cancelarProv}" style=
 </div>
 ${v.hasProvSinDatos ? html`
 <div style="margin-top: 16px; background: #FDF0D5; color: #7A4A00; border-radius: 6px; padding: 10px 12px; font-size: 13px">
-<strong>Proveedores con OCs pero sin datos bancarios:</strong>
+<strong>Proveedores con OCs que no están en el catálogo:</strong>
 <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px">${(v.provSinDatos || []).map((p) => html`<button type="button" onClick="${p.completar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">${p.nombre} · completar</button>`)}</div>
 </div>
 ` : null}
-<div style="margin-top: 16px; max-height: 50vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px">
+${(v.provFiltros || []).map((c) => html`<button type="button" onClick="${c.go}" style="${c.style}">${c.label} <span style="font-family: 'IBM Plex Mono', monospace">(${c.n})</span></button>`)}
+<input class="in" type="search" aria-label="Buscar proveedor" value="${v.provBuscar}" onInput="${v.onProvBuscar}" placeholder="Buscar por nombre, razón social o RFC" style="flex: 1 1 220px; max-width: 360px; min-height: 40px" />
+</div>
+<div style="margin-top: 10px; max-height: 60vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
 <table class="t tc">
-<thead><tr><th>Nombre comercial</th><th>Beneficiario</th><th>Banco · CLABE</th><th></th></tr></thead>
+<thead><tr><th>Nombre comercial</th><th>Razón social · RFC</th><th>Banco · CLABE</th><th>Datos</th><th></th></tr></thead>
 <tbody>
 ${(v.provLista || []).map((p) => html`
-<tr><td style="font-weight: 600">${p.nombreComercial}</td><td>${p.beneficiario}</td><td><span>${p.banco}</span><br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.clabeFmt}</span></td>
+<tr><td style="font-weight: 600">${p.nombreComercial}${p.hasAlias ? html`<br /><span style="font-size: 11px; font-weight: 400; color: #5B5F68">también: ${p.aliasTxt}</span>` : null}</td><td>${p.beneficiario}<br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.rfc}</span></td><td><span>${p.banco}</span><br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.clabeFmt}</span></td><td><span style="${p.estadoStyle}">${p.estadoTxt}</span></td>
 <td style="white-space: nowrap"><button type="button" onClick="${p.editar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Editar</button>${v.canBorrarCat ? html` <button type="button" onClick="${p.borrar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Borrar</button>` : null}</td></tr>
 `)}
 </tbody>
