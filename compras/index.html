@@ -1,0 +1,1730 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Filtro de compras CASYCO</title>
+<meta name="description" content="Filtro de autorización de órdenes de compra, pagos y saldos por obra de CASYCO.">
+<meta name="theme-color" content="#15171C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Compras CASYCO">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="icon" type="image/png" href="../icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">
+<style>
+:root{color-scheme:light}
+html,body{background:#F3F2EE;color:#15171C}
+body{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px));font-family:'IBM Plex Sans',system-ui,sans-serif}
+.login form{width:100%;max-width:380px;background:#FFFFFF;border:1px solid #DDDBD4;border-radius:10px;padding:28px;display:flex;flex-direction:column;gap:14px}
+.login .marca{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.12em;color:#B45309}
+.login h1{margin:0;font-size:22px}
+.login p{margin:0;font-size:14px;color:#5B5F68}
+.login label{font-size:13px;font-weight:600;color:#33363C;display:flex;flex-direction:column;gap:6px}
+.login input{font:inherit;font-size:16px;padding:10px 12px;border:1px solid #B9B7AF;border-radius:6px;min-height:44px}
+.login input:focus{outline:2px solid #1E3A8A;outline-offset:1px}
+.login button{min-height:48px;border:none;border-radius:6px;background:#15171C;color:#FFFFFF;font:inherit;font-size:16px;font-weight:600;cursor:pointer}
+.login button:disabled{opacity:.6}
+.login .msg{background:#FBE0DC;color:#9F1D12;border-radius:6px;padding:10px 12px;font-size:14px;font-weight:600}
+
+html,body{margin:0;min-height:100%}
+a{color:#1E3A8A}a:hover{color:#15171C}
+*{box-sizing:border-box}
+.t{width:100%;border-collapse:collapse;font-size:14px}
+.t th{text-align:left;font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#5B5F68;padding:10px 12px;border-bottom:1px solid #DDDBD4;white-space:nowrap;background:#FAF9F6}
+.t td{padding:10px 12px;border-bottom:1px solid #ECEAE4;vertical-align:top}
+.t .n{text-align:right;font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+.t tfoot td{font-weight:700;border-top:2px solid #15171C;border-bottom:none}
+.t thead th{position:sticky;top:0;z-index:1}
+.tc{font-size:13px}.tc th{padding:8px 8px;font-size:11px}.tc td{padding:8px 8px}
+.lb{font-size:13px;font-weight:600;color:#33363C}
+.in{font:inherit;font-size:15px;padding:10px 12px;border:1px solid #B9B7AF;border-radius:6px;background:#fff;color:#15171C;min-height:44px;width:100%}
+.in:focus{outline:2px solid #1E3A8A;outline-offset:1px;border-color:#1E3A8A}
+@media (max-width:640px){.wrap{padding:16px !important}.rep{padding:20px !important}}
+@media print{.noprint{display:none !important}.bgpage{height:auto !important;overflow:visible !important}div{max-height:none !important;overflow:visible !important}body,.bgpage{background:#FFFFFF !important}.wrap{padding:0 !important;max-width:none !important}.rep{border:none !important;padding:0 !important;max-width:none !important;box-shadow:none !important}.rep section,.rep tr{break-inside:avoid}@page{size:letter landscape;margin:12mm}}
+
+</style>
+</head>
+<body>
+<div id="login" class="login" hidden>
+<form id="login-form" autocomplete="on">
+<div class="marca">CASYCO</div>
+<h1>Filtro de compras</h1>
+<p>Entra con el correo y la contraseña que te dio Manuel.</p>
+<div id="login-msg" class="msg" role="alert" hidden></div>
+<label>Correo<input id="login-email" type="email" autocomplete="username" required></label>
+<label>Contraseña<input id="login-pass" type="password" autocomplete="current-password" required></label>
+<button id="login-btn" type="submit">Entrar</button>
+</form>
+</div>
+<div id="app"><div style="padding:24px;font-family:'IBM Plex Sans',system-ui,sans-serif;color:#33363C">Cargando filtro de compras…</div></div>
+<script src="https://cdn.jsdelivr.net/npm/preact@10.19.3/dist/preact.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.100.0/dist/umd/supabase.js"></script>
+<!-- Candado CASYCO: solo entra quien tiene el módulo "compras" -->
+<script src="../config.js"></script>
+<script src="../guard.js" data-modulo="compras"></script>
+<script>
+
+const FONTS_LINK = '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&amp;family=IBM+Plex+Sans:wght@400;500;600;700&amp;display=swap">';
+const html = htm.bind(preact.h);
+let __inst = null, __pending = false;
+function __render() { __pending = false; preact.render(TPL(__inst.renderVals()), document.getElementById('app')); }
+class DCLogic {
+  constructor(props) { this.props = props || {}; this.state = {}; }
+  setState(u) { const v = typeof u === 'function' ? u(this.state) : u; this.state = Object.assign({}, this.state, v || {}); if (!__pending && __inst) { __pending = true; queueMicrotask(__render); } }
+  forceUpdate() { this.setState({}); }
+}
+
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.AUTORIZA = { HOTELERIA: 'Manuel Castillo', INDUSTRIAL: 'Jesús Castillo' };
+    this.PAGA = { 'SANTANDER': 'Manuel Castillo', 'CUENTA PERSONAL': 'Manuel Castillo', 'EFECTIVO': 'Manuel Castillo', 'BANORTE': 'Dulce Castillo', 'SIN REGISTRO': 'Sin registro' };
+    this.META = {
+      PENDIENTE: { label: 'Sin revisar', bg: '#E6E4DD', fg: '#2B2E34' },
+      REVISION: { label: 'Revisión c/ obra', bg: '#FDF0D5', fg: '#7A4A00' },
+      SIN_PAGO_CLIENTE: { label: 'Sin pago del cliente', bg: '#EDE4F7', fg: '#4C1D95' },
+      POR_PAGAR: { label: 'Autorizado · por pagar', bg: '#DBE7FB', fg: '#1E3A8A' },
+      PAGADO: { label: 'Pagado', bg: '#DCEFE4', fg: '#14532D' },
+      CANCELADO: { label: 'Cancelado', bg: '#F1F1EF', fg: '#5B5F68' }
+    };
+    const obraDiv = {
+      'GP42': 'HOTELERIA', 'TXOCO': 'HOTELERIA', 'REFORMA': 'HOTELERIA', 'HGR-HAMBURGO': 'HOTELERIA', 'SMA': 'HOTELERIA',
+      'HOLBOX OC': 'HOTELERIA', 'HOLBOX HHB': 'HOTELERIA', 'CASA MANOLO': 'HOTELERIA', 'LOCALES COMERCIALES': 'HOTELERIA',
+      'TACUBA 53': 'HOTELERIA', 'ACABADOS TACUBA': 'HOTELERIA', 'JURICA': 'HOTELERIA', 'HGPSJ': 'HOTELERIA', 'OXXO': 'HOTELERIA',
+      'OTRAS': 'HOTELERIA', 'SMA/HGR/GP42': 'HOTELERIA', 'GASTOS GENERALES CASYCO': 'HOTELERIA',
+      'AISLACON': 'INDUSTRIAL', 'SALTO': 'INDUSTRIAL', 'CUAUTLAN': 'INDUSTRIAL'
+    };
+    const rows = [];
+    const uniq = (arr) => Array.from(new Set(arr.filter(Boolean))).sort();
+    this.state = {
+      tab: 'captura',
+      rows,
+      obraDiv,
+      proveedores: uniq(rows.map(r => r.proveedor)),
+      solicitantes: uniq(rows.map(r => r.solicita)),
+      form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: '', notas: '' },
+      formMsg: '', formOk: true,
+      reviewer: 'LMCM',
+      buscar: '', filtroVista: 'autorizar', flash: '', flashPagar: false, undo: null,
+      rol: '', userEmail: '', proveedoresCat: [], solicitantesCat: [], rolesList: [],
+      catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' }, provFiltro: 'TODOS', provBuscar: '', editId: '', catObra: { nombre: '', division: 'HOTELERIA' }, catSol: { nombre: '', puesto: '' },
+      rolForm: { email: '', nombre: '', rol: 'compras' }, catMsg: '', catOk: true,
+      payBank: {},
+      finFilter: 'TODOS',
+      weekOffset: 0,
+      budgets: {},
+      deposits: [],
+      depForm: { obra: '', q: '', fecha: '', monto: '', mo: '', he: '', ot: '', nota: '' },
+      depMsg: '', depOk: true, depQ: '',
+      persHist: [], loaded: false, dbOk: true, dbMsg: ''
+    };
+  }
+
+  pad(n) { return String(n).padStart(2, '0'); }
+  iso(d) { return d.getFullYear() + '-' + this.pad(d.getMonth() + 1) + '-' + this.pad(d.getDate()); }
+  hoy() { return this.iso(new Date()); }
+  toD(s) { const p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); }
+  dias(a, b) { return Math.round((this.toD(b) - this.toD(a)) / 86400000); }
+  fd(s) { if (!s) return '—'; const p = s.split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  money(n) { return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0); }
+  num(v) { const n = parseFloat(String(v || '').replace(/[^0-9.]/g, '')); return isNaN(n) ? 0 : n; }
+  bucket(r) {
+    if (r.estatus === 'CANCELADO') return 'CANCELADO';
+    if (r.fechaPago) return 'PAGADO';
+    if (r.estatus === 'AUTORIZADO') return 'POR_PAGAR';
+    return r.estatus;
+  }
+  chip(m) { return 'display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;white-space:nowrap;background:' + m.bg + ';color:' + m.fg; }
+  upd(id, patch) { this.setState(s => ({ rows: s.rows.map(r => r.id === id ? Object.assign({}, r, patch) : r) })); if (this.db) this.db.doc('ocs/' + id).update(patch).catch(e => this.dbErr(e)); }
+  dbErr(e) { this.setState({ dbMsg: 'No se pudo guardar el último cambio (' + ((e && e.code) || 'error') + '). Revisa tu conexión y vuelve a intentarlo.' }); }
+  saveObras(map) { if (this.db) this.db.doc('config/obras').set({ map }).catch(e => this.dbErr(e)); }
+  setForm(k, v) {
+    this.setState(s => {
+      const form = Object.assign({}, s.form, { [k]: v });
+      if (k === 'obra') { const d = s.obraDiv[v.trim().toUpperCase()]; if (d) form.division = d; }
+      return { form, formMsg: '' };
+    });
+  }
+
+  qKeyOf(iso) { return iso.slice(0, 7) + '|' + (Number(iso.slice(8, 10)) <= 15 ? 'q1' : 'q2'); }
+  qLabelOf(key) {
+    const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const p = key.split('|'), ym = p[0].split('-').map(Number);
+    return (p[1] === 'q1' ? '1ª' : '2ª') + ' quincena ' + MES[ym[1] - 1] + ' ' + ym[0];
+  }
+  depSum(obra, qk) {
+    const l = this.state.deposits.filter(d => d.obra === obra && d.q === qk);
+    const t = (k) => l.reduce((a, d) => a + d[k], 0);
+    const monto = t('monto'), mo = t('mo'), he = t('he'), ot = t('ot');
+    return { n: l.length, monto, mo, he, ot, disp: monto - mo - he - ot };
+  }
+  setDep(k, v) {
+    this.setState(s => {
+      const depForm = Object.assign({}, s.depForm, { [k]: v });
+      if (k === 'fecha' && /^\d{4}-\d{2}-\d{2}$/.test(v)) depForm.q = this.qKeyOf(v);
+      return { depForm, depMsg: '' };
+    });
+  }
+  submitDep() {
+    const s = this.state, f = s.depForm, hoy = this.hoy();
+    const obra = f.obra.trim().toUpperCase();
+    const monto = this.num(f.monto), mo = this.num(f.mo), he = this.num(f.he), ot = this.num(f.ot);
+    const fecha = f.fecha || hoy, q = f.q || this.qKeyOf(fecha);
+    const falta = [];
+    if (!obra) falta.push('obra'); if (!monto) falta.push('monto depositado');
+    if (falta.length) { this.setState({ depMsg: 'Falta: ' + falta.join(', ') + '.', depOk: false }); return; }
+    if (mo + he + ot > monto) { this.setState({ depMsg: 'Lo asignado a mano de obra y utilidad supera el depósito.', depOk: false }); return; }
+    const dep = { id: 'd' + Date.now(), obra, q, fecha, monto, mo, he, ot, nota: f.nota.trim() };
+    if (this.db) { const body = Object.assign({}, dep); delete body.id; this.db.doc('depositos/' + dep.id).set(body).catch(e => this.dbErr(e)); }
+    if (!s.obraDiv[obra]) this.saveObras(Object.assign({}, s.obraDiv, { [obra]: 'HOTELERIA' }));
+    this.setState({
+      deposits: s.deposits.concat([dep]),
+      obraDiv: s.obraDiv[obra] ? s.obraDiv : Object.assign({}, s.obraDiv, { [obra]: 'HOTELERIA' }),
+      depForm: { obra: '', q: f.q, fecha: f.fecha, monto: '', mo: '', he: '', ot: '', nota: '' },
+      depQ: q,
+      depMsg: 'Depósito de ' + obra + ' registrado: ' + this.money(monto - mo - he - ot) + ' disponibles para materiales.', depOk: true
+    });
+  }
+
+  slug(t) { return (String(t || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120)) || 'X'; }
+  clabeOk(c) {
+    if (!/^\d{18}$/.test(c)) return false;
+    const w = [3, 7, 1]; let t = 0;
+    for (let i = 0; i < 17; i++) t += (Number(c[i]) * w[i % 3]) % 10;
+    return (10 - (t % 10)) % 10 === Number(c[17]);
+  }
+  bancoDeClabe(c) {
+    const B = { '002': 'BANAMEX', '006': 'BANCOMEXT', '009': 'BANOBRAS', '012': 'BBVA MÉXICO', '014': 'SANTANDER', '019': 'BANJERCITO', '021': 'HSBC', '030': 'BAJÍO', '036': 'INBURSA', '042': 'MIFEL', '044': 'SCOTIABANK', '058': 'BANREGIO', '059': 'INVEX', '060': 'BANSI', '062': 'AFIRME', '072': 'BANORTE', '106': 'BANK OF AMERICA', '112': 'BMONEX', '127': 'BANCO AZTECA', '130': 'COMPARTAMOS', '132': 'MULTIVA', '133': 'ACTINVER', '136': 'INTERCAM', '137': 'BANCOPPEL', '138': 'UALÁ', '140': 'CONSUBANCO', '143': 'CIBANCO', '145': 'BBASE', '147': 'BANKAOOL', '148': 'PAGATODO', '150': 'INMOBILIARIO', '151': 'DONDE', '152': 'BANCREA', '155': 'ICBC', '156': 'SABADELL', '166': 'BANCO DEL BIENESTAR', '167': 'HEY BANCO', '638': 'NU MÉXICO', '646': 'STP', '722': 'MERCADO PAGO W', '728': 'SPIN BY OXXO' };
+    return B[String(c || '').slice(0, 3)] || '';
+  }
+  setCat(grupo, k, v) {
+    this.setState(s => {
+      const o = Object.assign({}, s[grupo], { [k]: v });
+      if (grupo === 'catProv' && k === 'clabe') { const d = v.replace(/\D/g, '').slice(0, 18); o.clabe = d; const b = this.bancoDeClabe(d); if (b && (!s.catProv.banco || s.catProv.banco === this.bancoDeClabe(s.catProv.clabe))) o.banco = b; }
+      return { [grupo]: o, catMsg: '' };
+    });
+  }
+  catAviso(msg, ok) { this.setState({ catMsg: msg, catOk: !!ok }); }
+  rfcOk(r) { return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(r); }
+  provFaltan(p) {
+    const f = [];
+    if (!p.beneficiario) f.push('razón social');
+    if (!p.rfc) f.push('RFC'); else if (!this.rfcOk(p.rfc)) f.push('RFC inválido');
+    if (!p.clabe) f.push('CLABE'); else if (!this.clabeOk(p.clabe)) f.push(/^\d{16}$/.test(p.clabe) ? 'CLABE (es tarjeta)' : 'CLABE inválida');
+    if (!p.banco) f.push('banco');
+    return f;
+  }
+  provBuscarNombre(n) { return n ? (this._provMap || {})[String(n).trim().toUpperCase()] : null; }
+  guardarProv() {
+    const s = this.state, p = s.catProv;
+    const nombreComercial = p.nombreComercial.trim().toUpperCase(), beneficiario = p.beneficiario.trim().toUpperCase(), rfc = (p.rfc || '').trim().toUpperCase().replace(/\s/g, ''), banco = p.banco.trim().toUpperCase(), clabe = p.clabe.trim();
+    if (!nombreComercial) return this.catAviso('Escribe al menos el nombre comercial del proveedor.');
+    const id = p.id || this.slug(nombreComercial);
+    if (!p.id && s.proveedoresCat.some(x => x.id === id)) return this.catAviso('Ya existe un proveedor con ese nombre comercial. Usa «Editar» para cambiar sus datos.');
+    const prev = s.proveedoresCat.find(x => x.id === id) || {};
+    const data = Object.assign({}, prev, { nombreComercial, beneficiario, rfc, banco, clabe, actualizo: s.userEmail || '' }); delete data.id;
+    this.setState({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== id).concat([Object.assign({ id }, data)]), catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' } });
+    if (this.db) this.db.doc('proveedores/' + id).set(data).catch(e => this.dbErr(e));
+    const faltan = this.provFaltan(data);
+    this.catAviso('Proveedor ' + nombreComercial + ' guardado' + (faltan.length ? ' como INCOMPLETO (falta: ' + faltan.join(', ') + ').' : ' con datos completos.'), true);
+  }
+  guardarObra() {
+    const s = this.state, nombre = s.catObra.nombre.trim().toUpperCase();
+    if (!nombre) return this.catAviso('Escribe el nombre de la obra.');
+    if (s.obraDiv[nombre]) return this.catAviso('La obra ' + nombre + ' ya existe.');
+    const map = Object.assign({}, s.obraDiv, { [nombre]: s.catObra.division });
+    this.setState({ obraDiv: map, catObra: { nombre: '', division: 'HOTELERIA' } });
+    this.saveObras(map);
+    this.catAviso('Obra ' + nombre + ' agregada a ' + (s.catObra.division === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería') + '.', true);
+  }
+  guardarSol() {
+    const s = this.state, nombre = s.catSol.nombre.trim().toUpperCase(), puesto = s.catSol.puesto.trim().toUpperCase();
+    if (!nombre) return this.catAviso('Escribe el nombre de quien solicita.');
+    const id = this.slug(nombre);
+    if (s.solicitantesCat.some(x => x.id === id)) return this.catAviso(nombre + ' ya está registrado.');
+    this.setState({ solicitantesCat: s.solicitantesCat.concat([{ id, nombre, puesto }]), catSol: { nombre: '', puesto: '' } });
+    if (this.db) this.db.doc('solicitantes/' + id).set({ nombre, puesto }).catch(e => this.dbErr(e));
+    this.catAviso(nombre + ' agregado.', true);
+  }
+  async guardarRol() {
+    const f = this.state.rolForm, email = f.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return this.catAviso('Escribe un correo válido.');
+    if (!window.__rolesApi) return;
+    const r = await window.__rolesApi.guardar({ email, nombre: f.nombre.trim(), rol: f.rol });
+    if (r.error) return this.catAviso('No se pudo guardar el permiso: ' + r.error.message);
+    this.setState({ rolForm: { email: '', nombre: '', rol: 'compras' } });
+    this.catAviso('Permiso guardado para ' + email + '.', true);
+    window.__rolesApi.cargar();
+  }
+
+  async descargarReporte(titulo) {
+    let dl = null; try { dl = await window.claude.use('downloads'); } catch (e) {}
+    if (!dl) { this.setState({ dbMsg: 'Esta vista no permite descargar archivos.' }); return; }
+    const el = document.querySelector('.rep'); if (!el) return;
+    const css = Array.from(document.querySelectorAll('style')).map(x => x.textContent).join('\n');
+    const doc = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + titulo + '</title>' + FONTS_LINK + '<style>' + css + '</style></head><body style="background:#FFFFFF;margin:0;padding:24px">' + el.outerHTML + '</body></html>';
+    try { await dl.save({ filename: 'Reporte CASYCO - ' + titulo + ' - ' + this.hoy() + '.html', data: doc }); }
+    catch (e) { if (!e || e.code !== 'declined') this.setState({ dbMsg: 'No se pudo descargar el reporte (' + ((e && e.code) || 'error') + ').' }); }
+  }
+
+  decorate(r, hoy, dA, dC) {
+    const b = this.bucket(r), M = this.META[b], id = r.id;
+    let d = null, alarmTxt = '';
+    const pl = (n) => n + (n === 1 ? ' día' : ' días');
+    if (b === 'PENDIENTE') { d = Math.max(0, this.dias(r.fechaCaptura, hoy)); alarmTxt = d === 0 ? 'Enviada hoy' : pl(d) + ' sin revisar'; }
+    else if (b === 'REVISION' || b === 'SIN_PAGO_CLIENTE') { d = Math.max(0, this.dias(r.fechaCaptura, hoy)); alarmTxt = pl(d) + ' sin autorizar'; }
+    else if (b === 'POR_PAGAR') { d = Math.max(0, this.dias(r.fechaAut || r.fechaCaptura, hoy)); alarmTxt = d === 0 ? 'Autorizada hoy' : pl(d) + ' sin pagar'; }
+    const lvl = d === null ? null : (d >= dC ? 'crit' : d >= dA ? 'warn' : 'ok');
+    const AL = { ok: ['#DCEFE4', '#14532D'], warn: ['#FDF0D5', '#7A4A00'], crit: ['#FBE0DC', '#9F1D12'] };
+    const alarmStyle = lvl ? 'display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:700;white-space:nowrap;background:' + AL[lvl][0] + ';color:' + AL[lvl][1] : '';
+    const bancoSel = this.state.payBank[id] || 'SANTANDER';
+    const hoyS = hoy;
+    const prev = { estatus: r.estatus, fechaAut: r.fechaAut, fechaPago: r.fechaPago, banco: r.banco };
+    const fl = (msg, pag) => this.setState({ flash: msg, flashPagar: !!pag, undo: { id, prev, oc: r.oc } });
+    return Object.assign({}, r, {
+      bucket: b, chipLabel: M.label, chipStyle: this.chip(M),
+      montoTxt: this.money(r.monto), fcTxt: this.fd(r.fechaCaptura), fcCorto: this.fd(r.fechaCaptura).slice(0, 5), faTxt: this.fd(r.fechaAut), fpTxt: this.fd(r.fechaPago),
+      dias: d === null ? -1 : d, hasAlarm: !!lvl, isCrit: lvl === 'crit', alarmTxt, alarmStyle,
+      autoriza: this.AUTORIZA[r.division] || '—',
+      cuentaTxt: r.fechaPago ? (r.banco + ' · ' + (this.PAGA[r.banco] || '—')) : '—',
+      notasTxt: r.notas || 'Sin observaciones', hasNotas: !!r.notas,
+      notasAll: [r.notas, r.notaDir ? 'DIR: ' + r.notaDir : ''].filter(Boolean).join(' · ') || '—',
+      notaId: 'nd-' + id,
+      bancoSel, pagaPreview: this.PAGA[bancoSel],
+      onAut: () => { this.upd(id, { estatus: 'AUTORIZADO', fechaAut: hoyS }); fl(r.oc + ' autorizada · ahora está en «Autorizado · por pagar». Ahí eliges la cuenta y registras el pago.', true); },
+      onRev: () => { this.upd(id, { estatus: 'REVISION', fechaAut: '' }); fl(r.oc + ' marcada en revisión con obra.'); },
+      onSinPago: () => { this.upd(id, { estatus: 'SIN_PAGO_CLIENTE', fechaAut: '' }); fl(r.oc + ' detenida: sin pago del cliente.'); },
+      onCancel: () => { this.upd(id, { estatus: 'CANCELADO' }); fl(r.oc + ' cancelada.'); },
+      onNota: (e) => this.upd(id, { notaDir: e.target.value }),
+      onBanco: (e) => { const v = e.target.value; this.setState(s => ({ payBank: Object.assign({}, s.payBank, { [id]: v }) })); },
+      onPagar: () => { const bk = this.state.payBank[id] || 'SANTANDER'; this.upd(id, { fechaPago: hoyS, banco: bk }); fl(r.oc + ' pagada con ' + bk + ' · pagó ' + this.PAGA[bk] + '.'); },
+      fpCorto: this.fd(r.fechaPago).slice(0, 5),
+      esDevuelto: !!r.devuelto, devTxt: r.devuelto ? 'Devuelto ' + this.fd(r.devuelto) : '',
+      diasDev: r.fechaPago ? Math.max(0, this.dias(r.fechaPago, hoy)) : 0,
+      puedeActuar: this.state.rol === 'direccion' && ['PENDIENTE', 'REVISION', 'SIN_PAGO_CLIENTE', 'CANCELADO'].indexOf(b) >= 0,
+      provCuenta: (() => { const p = this.provBuscarNombre(r.proveedor); if (!p) return 'No registrado en catálogo'; const f = this.provFaltan(p); return (p.banco || 'Sin banco') + ' · CLABE ' + (p.clabe || '—') + (f.length ? ' · Incompleto: ' + f.join(', ') : ''); })(),
+      provCuentaStyle: 'font-size:11px;font-family:\'IBM Plex Mono\',monospace;color:' + ((() => { const p = this.provBuscarNombre(r.proveedor); return p && !this.provFaltan(p).length; })() ? '#33363C' : '#9F1D12'),
+      hasEdit: !!(r.editada && r.editada.length), editTxt: (r.editada && r.editada.length) ? (r.editada[r.editada.length - 1].cambios + ' · ' + this.fd(r.editada[r.editada.length - 1].fecha)) : '',
+      puedeEditar: !r.fechaPago && r.estatus !== 'CANCELADO' && !!this.state.rol,
+      onEditar: () => { this.setState({ editId: id, tab: 'captura', formMsg: '', form: { oc: r.oc, monto: String(r.monto), proveedor: r.proveedor, obra: r.obra, division: r.division, solicita: r.solicita, notas: r.notas || '' } }); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} },
+      puedeRegresar: b !== 'PENDIENTE', regresarTxt: b === 'CANCELADO' ? 'Reactivar a por autorizar' : 'Regresar a por autorizar',
+      onRegresar: () => { this.upd(id, { estatus: 'PENDIENTE', fechaAut: '' }); this.setState({ flash: r.oc + ' regresó a «Por autorizar».', flashPagar: false, undo: null }); },
+      onDevolver: () => this.upd(id, { devuelto: hoyS }),
+      onDeshacerDev: () => this.upd(id, { devuelto: '' })
+    });
+  }
+
+  submit() {
+    if (this.state.editId) return this.guardarEdicion();
+    const s = this.state, f = s.form;
+    const oc = f.oc.trim().toUpperCase(), prov = f.proveedor.trim().toUpperCase(), sol = f.solicita.trim().toUpperCase();
+    const obra = f.obra.trim().toUpperCase() || 'GASTOS GENERALES CASYCO';
+    const monto = this.num(f.monto);
+    const falta = [];
+    if (!oc) falta.push('OC'); if (!monto) falta.push('monto'); if (!prov) falta.push('proveedor'); if (!sol) falta.push('quién solicita');
+    if (falta.length) { this.setState({ formMsg: 'Falta: ' + falta.join(', ') + '.', formOk: false }); return; }
+    if (s.rows.some(r => r.oc === oc && r.estatus !== 'CANCELADO')) { this.setState({ formMsg: 'La OC ' + oc + ' ya está en el filtro.', formOk: false }); return; }
+    const provCat = this.provBuscarNombre(prov);
+    if (!provCat) { this.setState({ formMsg: 'El proveedor ' + prov + ' no está registrado. Regístralo en Catálogos (nombre comercial, razón social, RFC, CLABE y banco).', formOk: false }); return; }
+    if (!s.obraDiv[obra]) { this.setState({ formMsg: 'La obra ' + obra + ' no está registrada. Agrégala en Catálogos.', formOk: false }); return; }
+    if (!s.solicitantesCat.some(p => p.nombre === sol)) { this.setState({ formMsg: sol + ' no está registrado en «Quién solicita». Agrégalo en Catálogos.', formOk: false }); return; }
+    let id = oc.replace(/[^A-Za-z0-9_\-.~:@+]/g, '_'); if (!id || id === '.' || id === '..') id = 'oc'; if (s.rows.some(r => r.id === id)) id = id + '_' + Date.now();
+    const row = { id, oc, monto, proveedor: provCat.nombreComercial, obra, solicita: sol, notas: f.notas.trim(), estatus: 'PENDIENTE', division: f.division, fechaCaptura: this.hoy(), fechaAut: '', banco: '', fechaPago: '', notaDir: '', capturo: s.userEmail || '' };
+    if (this.db) { const body = Object.assign({}, row); delete body.id; this.db.doc('ocs/' + id).set(body).catch(e => this.dbErr(e)); }
+    if (s.obraDiv[obra] !== f.division) this.saveObras(Object.assign({}, s.obraDiv, { [obra]: f.division }));
+    const add = (arr, v) => arr.indexOf(v) >= 0 ? arr : arr.concat([v]).sort();
+    this.setState({
+      rows: s.rows.concat([row]),
+      obraDiv: Object.assign({}, s.obraDiv, { [obra]: f.division }),
+      proveedores: add(s.proveedores, prov),
+      solicitantes: add(s.solicitantes, sol),
+      form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: f.solicita, notas: '' },
+      formMsg: 'OC ' + oc + ' enviada · la autoriza ' + this.AUTORIZA[f.division] + '.', formOk: true
+    });
+  }
+
+  guardarEdicion() {
+    const s = this.state, f = s.form, id = s.editId;
+    const r = s.rows.find(x => x.id === id);
+    if (!r) { this.setState({ editId: '', formMsg: 'No se encontró la OC a editar.', formOk: false }); return; }
+    if (r.fechaPago) { this.setState({ formMsg: 'La OC ' + r.oc + ' ya está pagada; no se puede editar.', formOk: false }); return; }
+    const oc = f.oc.trim().toUpperCase(), sol = f.solicita.trim().toUpperCase();
+    const obra = f.obra.trim().toUpperCase() || 'GASTOS GENERALES CASYCO';
+    const monto = this.num(f.monto);
+    const falta = [];
+    if (!oc) falta.push('OC'); if (!monto) falta.push('monto'); if (!f.proveedor.trim()) falta.push('proveedor'); if (!sol) falta.push('quién solicita');
+    if (falta.length) { this.setState({ formMsg: 'Falta: ' + falta.join(', ') + '.', formOk: false }); return; }
+    if (s.rows.some(x => x.id !== id && x.oc === oc && x.estatus !== 'CANCELADO')) { this.setState({ formMsg: 'Ya existe otra OC con el número ' + oc + '.', formOk: false }); return; }
+    const provCat = this.provBuscarNombre(f.proveedor);
+    const mismoProv = !provCat && f.proveedor.trim().toUpperCase() === r.proveedor;
+    if (!provCat && !mismoProv) { this.setState({ formMsg: 'El proveedor ' + f.proveedor.trim().toUpperCase() + ' no está registrado. Regístralo en Catálogos.', formOk: false }); return; }
+    if (!s.obraDiv[obra]) { this.setState({ formMsg: 'La obra ' + obra + ' no está registrada. Agrégala en Catálogos.', formOk: false }); return; }
+    if (!s.solicitantesCat.some(p => p.nombre === sol)) { this.setState({ formMsg: sol + ' no está registrado en «Quién solicita». Agrégalo en Catálogos.', formOk: false }); return; }
+    const nuevo = { oc, monto, proveedor: provCat ? provCat.nombreComercial : r.proveedor, obra, division: f.division, solicita: sol, notas: f.notas.trim() };
+    const etiquetas = { oc: 'OC', monto: 'Monto', proveedor: 'Proveedor', obra: 'Obra', division: 'División', solicita: 'Solicita', notas: 'Observaciones' };
+    const cambios = Object.keys(nuevo).filter(k => String(r[k] == null ? '' : r[k]) !== String(nuevo[k])).map(k =>
+      etiquetas[k] + ' ' + (k === 'monto' ? this.money(r.monto) + ' → ' + this.money(monto) : (r[k] || '—') + ' → ' + (nuevo[k] || '—')));
+    if (!cambios.length) { this.setState({ formMsg: 'No hiciste cambios en la OC ' + r.oc + '.', formOk: false }); return; }
+    const patch = Object.assign({}, nuevo, { editada: (r.editada || []).concat([{ fecha: this.hoy(), por: s.userEmail || '', cambios: cambios.join('; ') }]) });
+    let extra = '';
+    if (r.estatus === 'AUTORIZADO' && monto !== r.monto) { patch.estatus = 'PENDIENTE'; patch.fechaAut = ''; extra = ' Como cambió el monto, regresó a «Por autorizar».'; }
+    this.upd(id, patch);
+    this.setState({ editId: '', form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: f.solicita, notas: '' }, formMsg: 'OC ' + oc + ' actualizada: ' + cambios.join('; ') + '.' + extra, formOk: true });
+  }
+
+  renderVals() {
+    const rol = this.state.rol || '';
+    const esDir = rol === 'direccion', esConta = rol === 'contabilidad', esCompras = !esDir && !esConta;
+    const permitidas = esCompras ? ['captura', 'filtro', 'catalogos'] : null;
+    const st = (permitidas && permitidas.indexOf(this.state.tab) < 0) ? Object.assign({}, this.state, { tab: 'captura', report: null }) : this.state;
+    const hoy = this.hoy();
+    this._provMap = {}; (st.proveedoresCat || []).forEach(p => { [p.beneficiario].concat(p.alias || []).forEach(k => { if (k) this._provMap[String(k).toUpperCase()] = p; }); }); (st.proveedoresCat || []).forEach(p => { this._provMap[p.nombreComercial] = p; });
+    const dA = this.props.diasAlerta ?? 2, dC = this.props.diasCritico ?? 4;
+    const rows = st.rows.map(r => this.decorate(r, hoy, dA, dC));
+    const B = ['PAGADO', 'POR_PAGAR', 'REVISION', 'SIN_PAGO_CLIENTE', 'PENDIENTE'];
+    const sum = (list) => list.reduce((a, r) => a + r.monto, 0);
+
+    // tabs
+    const lateAll = rows.filter(r => (r.bucket === 'PENDIENTE' || r.bucket === 'REVISION') && r.isCrit).length;
+    const tabDefs = [['captura', 'Captura · Compras', 0], ['filtro', 'Filtro de autorización', lateAll], ['finanzas', 'Estado financiero', 0], ['semana', 'Resumen semanal', 0], ['depositos', 'Depósitos y saldos', 0], ['personal', 'Cuenta personal Manuel', 0], ['santander', 'Cuenta Santander', 0], ['banorte', 'Cuenta Banorte', 0], ['catalogos', 'Catálogos', 0]].filter(t => !permitidas || permitidas.indexOf(t[0]) >= 0);
+    const tabs = tabDefs.map(t => ({
+      label: t[1], badge: t[2], hasBadge: t[2] > 0,
+      go: () => this.setState({ tab: t[0], report: null }),
+      style: 'min-height:44px;padding:10px 16px;border:none;border-radius:6px 6px 0 0;font:inherit;font-size:15px;font-weight:600;cursor:pointer;' +
+        (st.tab === t[0] ? 'background:#F3F2EE;color:#15171C' : 'background:transparent;color:#E6E4DC')
+    }));
+
+    // captura
+    const recent = rows.slice().sort((a, b) => (b.fechaCaptura.localeCompare(a.fechaCaptura)) || (b.id - a.id));
+
+    // filtro
+    const revDiv = st.reviewer === 'LMCM' ? 'HOTELERIA' : 'INDUSTRIAL';
+    const inQueue = (r) => r.bucket === 'PENDIENTE' || r.bucket === 'REVISION' || r.bucket === 'SIN_PAGO_CLIENTE';
+    const prio = { PENDIENTE: 0, REVISION: 1, SIN_PAGO_CLIENTE: 2 };
+    const bq = (st.buscar || '').trim().toUpperCase();
+    const match = (r) => !bq || (r.oc + ' ' + r.obra + ' ' + r.proveedor + ' ' + r.solicita).toUpperCase().indexOf(bq) >= 0;
+    const queue = rows.filter(r => r.division === revDiv && inQueue(r) && match(r)).sort((a, b) => (prio[a.bucket] - prio[b.bucket]) || (b.dias - a.dias));
+    const reviewers = [['LMCM', 'Manuel Castillo', 'HOTELERIA', 'Hotelería'], ['JCE', 'Jesús Castillo', 'INDUSTRIAL', 'Industrial']].map(x => ({
+      name: x[1], div: x[3], n: rows.filter(r => r.division === x[2] && inQueue(r)).length,
+      go: () => this.setState({ reviewer: x[0] }),
+      style: 'min-height:44px;padding:0 16px;border-radius:22px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;' +
+        (st.reviewer === x[0] ? 'background:#15171C;color:#FFFFFF;border:1px solid #15171C' : 'background:#FFFFFF;color:#15171C;border:1px solid #B9B7AF')
+    }));
+    const porPagar = rows.filter(r => r.bucket === 'POR_PAGAR' && match(r)).sort((a, b) => b.dias - a.dias);
+
+    // finanzas
+    const agg = (list) => { const o = {}; B.forEach(k => { o[k] = this.money(sum(list.filter(r => r.bucket === k))); }); o.TOTAL = this.money(sum(list.filter(r => r.bucket !== 'CANCELADO'))); return o; };
+    const kpiDef = [['PENDIENTE'], ['REVISION'], ['SIN_PAGO_CLIENTE'], ['POR_PAGAR'], ['PAGADO']];
+    const kpis = kpiDef.map(k => { const m = this.META[k[0]]; const l = rows.filter(r => r.bucket === k[0]); return { label: m.label, montoTxt: this.money(sum(l)), n: l.length, dotStyle: 'display:inline-block;width:10px;height:10px;border-radius:2px;background:' + m.fg }; });
+    const vivas = rows.filter(r => r.bucket !== 'CANCELADO');
+    kpis.unshift({ label: 'Total comprometido', montoTxt: this.money(sum(vivas)), n: vivas.length, dotStyle: 'display:inline-block;width:10px;height:10px;border-radius:2px;background:#15171C' });
+    const byDiv = ['HOTELERIA', 'INDUSTRIAL'].map(d => Object.assign({ name: d === 'HOTELERIA' ? 'Hotelería' : 'Industrial', autoriza: this.AUTORIZA[d] }, agg(rows.filter(r => r.division === d))));
+    const paid = rows.filter(r => r.bucket === 'PAGADO');
+    const byBank = Object.keys(this.PAGA).map(b => ({ banco: b, paga: this.PAGA[b], totalTxt: this.money(sum(paid.filter(r => r.banco === b))) }));
+    const obrasAll = Array.from(new Set(rows.map(r => r.obra)));
+    const byObra = obrasAll.map(o => { const l = rows.filter(r => r.obra === o); return Object.assign({ name: o, division: l[0].division === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería', _t: sum(l.filter(r => r.bucket !== 'CANCELADO')) }, agg(l)); }).sort((a, b) => b._t - a._t);
+    const chipDefs = [['TODOS', 'Todos']].concat(B.map(k => [k, this.META[k].label])).concat([['CANCELADO', 'Cancelado']]);
+    const finChips = chipDefs.map(c => ({
+      label: c[1], n: c[0] === 'TODOS' ? rows.length : rows.filter(r => r.bucket === c[0]).length,
+      go: () => this.setState({ finFilter: c[0] }),
+      style: 'min-height:40px;padding:0 14px;border-radius:20px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;' +
+        (st.finFilter === c[0] ? 'background:#15171C;color:#FFFFFF;border:1px solid #15171C' : 'background:#FFFFFF;color:#15171C;border:1px solid #B9B7AF')
+    }));
+    const detail = recent.filter(r => st.finFilter === 'TODOS' || r.bucket === st.finFilter);
+
+    // semana
+    const MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    const t0 = this.toD(hoy);
+    const mon = new Date(t0.getFullYear(), t0.getMonth(), t0.getDate() - ((t0.getDay() + 6) % 7) + st.weekOffset * 7);
+    const sun = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 6);
+    const ws = this.iso(mon), we = this.iso(sun);
+    const weekLabel = mon.getDate() + (mon.getMonth() === sun.getMonth() ? '' : ' de ' + MES[mon.getMonth()]) + ' al ' + sun.getDate() + ' de ' + MES[sun.getMonth()] + ' ' + sun.getFullYear();
+    const qFirst = mon.getDate() <= 15;
+    const lastDay = new Date(mon.getFullYear(), mon.getMonth() + 1, 0).getDate();
+    const qs = mon.getFullYear() + '-' + this.pad(mon.getMonth() + 1) + '-' + (qFirst ? '01' : '16');
+    const qe = mon.getFullYear() + '-' + this.pad(mon.getMonth() + 1) + '-' + (qFirst ? '15' : this.pad(lastDay));
+    const qLabel = (qFirst ? '1–15' : '16–' + lastDay) + ' ' + MES[mon.getMonth()];
+    const weekRows = vivas.filter(r => r.fechaCaptura >= ws && r.fechaCaptura <= we);
+    const wObras = Array.from(new Set(weekRows.map(r => r.obra)));
+    const weekObras = wObras.map(o => {
+      const items = weekRows.filter(r => r.obra === o).sort((a, b) => a.fechaCaptura.localeCompare(b.fechaCaptura));
+      const total = sum(items);
+      const qTotal = sum(vivas.filter(r => r.obra === o && r.fechaCaptura >= qs && r.fechaCaptura <= qe));
+      const budgetStr = st.budgets[o] || '';
+      const budget = this.num(budgetStr);
+      const pct = budget ? qTotal / budget * 100 : 0;
+      const over = budget && qTotal > budget;
+      const color = !budget ? '#B9B7AF' : over ? '#B42318' : pct >= 80 ? '#B45309' : '#1F6F43';
+      return {
+        name: o, division: items[0].division === 'INDUSTRIAL' ? 'INDUSTRIAL' : 'HOTELERÍA', items, _total: total,
+        totalTxt: this.money(total), qTotalTxt: this.money(qTotal),
+        pagadoTxt: this.money(sum(items.filter(r => r.bucket === 'PAGADO'))),
+        pendTxt: this.money(sum(items.filter(r => r.bucket !== 'PAGADO'))),
+        budget: budgetStr, budgetId: 'bq-' + o.replace(/[^A-Za-z0-9]/g, '-'),
+        onBudget: (e) => { const v = e.target.value; this.setState(s => ({ budgets: Object.assign({}, s.budgets, { [o]: v }) })); },
+        barStyle: 'height:100%;border-radius:5px;background:' + color + ';width:' + (budget ? Math.min(pct, 100) : 0) + '%',
+        budgetMsg: !budget ? 'Captura el pago quincenal del cliente para comparar.' : over ? 'Rebasa el pago quincenal por ' + this.money(qTotal - budget) + ' (' + pct.toFixed(0) + '%).' : pct.toFixed(0) + '% del pago quincenal · quedan ' + this.money(budget - qTotal) + '.',
+        budgetMsgStyle: 'font-weight:600;color:' + (!budget ? '#5B5F68' : over ? '#9F1D12' : pct >= 80 ? '#7A4A00' : '#14532D')
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    // quincena y mes por obra
+    const ym = mon.getFullYear() + '-' + this.pad(mon.getMonth() + 1);
+    const mesLabel = MES[mon.getMonth()] + ' ' + mon.getFullYear();
+    const mRows = vivas.filter(r => r.fechaCaptura.slice(0, 7) === ym);
+    const isQ1 = (r) => Number(r.fechaCaptura.slice(8, 10)) <= 15;
+    const saldoFmt = (p, g) => !p ? { t: 'Sin depósito', s: 'color:#5B5F68;font-family:inherit' } :
+      (p - g >= 0 ? { t: '+' + this.money(p - g), s: 'color:#14532D;font-weight:700' } : { t: '−' + this.money(g - p), s: 'color:#9F1D12;font-weight:700' });
+    let mesG = 0, mesP = 0;
+    const monthObras = Array.from(new Set(mRows.map(r => r.obra))).sort().map(o => {
+      const l = mRows.filter(r => r.obra === o);
+      const defs = [['q1', '1ª quincena', '1 al 15', l.filter(isQ1), 1], ['q2', '2ª quincena', '16 al ' + lastDay, l.filter(r => !isQ1(r)), 2]];
+      let gm = 0, pm = 0;
+      const qs = defs.map(d => {
+        const ds = this.depSum(o, ym + '|' + d[0]);
+        const p = ds.disp, g = sum(d[3]);
+        gm += g; pm += p;
+        const sf = saldoFmt(p, g);
+        return {
+          label: d[1], rango: d[2], gTxt: this.money(g), pagoTxt: ds.n ? this.money(p) : 'Sin depósito',
+          saldoTxt: sf.t, saldoStyle: sf.s,
+          rowStyle: d[4] === (qFirst ? 1 : 2) ? 'background:#FFF8E6' : ''
+        };
+      });
+      mesG += gm; mesP += pm;
+      const sm = saldoFmt(pm, gm);
+      return { name: o, qs, _gm: gm, _pm: pm, q1g: qs[0].gTxt, q1p: qs[0].pagoTxt, q2g: qs[1].gTxt, q2p: qs[1].pagoTxt, gmTxt: this.money(gm), pmTxt: pm ? this.money(pm) : '—', smTxt: sm.t, smStyle: sm.s };
+    });
+    const ms = saldoFmt(mesP, mesG);
+
+    // estado de cuenta: pagos con cuentas personales de Manuel (por devolver)
+    const updHist = (hid, patch) => { this.setState(s => ({ persHist: s.persHist.map(h => h.hid === hid ? Object.assign({}, h, patch) : h) })); if (this.db) this.db.doc('personal/' + hid).update(patch).catch(e => this.dbErr(e)); };
+    const histDec = st.persHist.map(h => Object.assign({}, h, {
+      bucket: 'PAGADO', banco: 'CUENTA PERSONAL', historico: true,
+      montoTxt: this.money(h.monto), fpCorto: this.fd(h.fechaPago).slice(0, 5),
+      diasDev: Math.max(0, this.dias(h.fechaPago, hoy)), esDevuelto: !!h.devuelto, devTxt: h.devuelto ? 'Devuelto ' + this.fd(h.devuelto) : '',
+      onDevolver: () => updHist(h.hid, { devuelto: hoy }), onDeshacerDev: () => updHist(h.hid, { devuelto: '' })
+    }));
+    const pers = rows.filter(r => r.bucket === 'PAGADO' && r.banco === 'CUENTA PERSONAL').concat(histDec);
+    const persPend = pers.filter(r => !r.devuelto).sort((a, b) => a.fechaPago.localeCompare(b.fechaPago));
+    const persDev = pers.filter(r => r.devuelto);
+    const movs = [];
+    pers.forEach(r => {
+      movs.push({ f: r.fechaPago, k: 0, concepto: 'Pago a proveedor', r, cargo: r.monto, abono: 0 });
+      if (r.devuelto) movs.push({ f: r.devuelto, k: 1, concepto: 'Devolución recibida', r, cargo: 0, abono: r.monto });
+    });
+    movs.sort((a, b) => a.f.localeCompare(b.f) || a.k - b.k || a.r.oc.localeCompare(b.r.oc));
+    let run = 0;
+    const edoCta = movs.map(m => { run += m.cargo - m.abono; return {
+      fechaTxt: this.fd(m.f), concepto: m.concepto, oc: m.r.oc, obra: m.r.obra, proveedor: m.r.proveedor,
+      cargoTxt: m.cargo ? this.money(m.cargo) : '', abonoTxt: m.abono ? this.money(m.abono) : '', saldoTxt: this.money(run),
+      rowStyle: m.k ? 'background:#F1F8F4' : '' }; });
+    const persObras = Array.from(new Set(persPend.map(r => r.obra))).sort().map(o => {
+      const l = persPend.filter(r => r.obra === o); return { name: o, n: l.length, totalTxt: this.money(sum(l)) };
+    });
+
+    // depósitos y saldos por quincena
+    const curQ = this.qKeyOf(hoy);
+    const qOpts = [];
+    { // de la siguiente quincena hacia atras (10 quincenas)
+      const d0 = this.toD(hoy); let y = d0.getFullYear(), m = d0.getMonth(), q = d0.getDate() <= 15 ? 2 : 1;
+      if (q === 1) { m++; if (m > 11) { m = 0; y++; } }
+      for (let i = 0; i < 10; i++) {
+        const key = y + '-' + this.pad(m + 1) + '|q' + q;
+        qOpts.push({ v: key, label: this.qLabelOf(key) });
+        if (q === 2) q = 1; else { q = 2; m--; if (m < 0) { m = 11; y--; } }
+      } }
+    const depQ = st.depQ || curQ;
+    const dqYm = depQ.split('|')[0], dqIs1 = depQ.split('|')[1] === 'q1';
+    const dqS = dqYm + (dqIs1 ? '-01' : '-16'), dqE = dqYm + (dqIs1 ? '-15' : '-31');
+    const dqRows = vivas.filter(r => r.fechaCaptura >= dqS && r.fechaCaptura <= dqE);
+    const dqDeps = st.deposits.filter(d => d.q === depQ);
+    const dObrasN = Array.from(new Set(dqDeps.map(d => d.obra).concat(dqRows.map(r => r.obra)).concat(st.deposits.filter(d => d.q < depQ).map(d => d.obra)))).sort();
+    let tDep = 0, tAsig = 0, tDisp = 0, tMat = 0, tAnt = 0;
+    const saldoObras = dObrasN.map(o => {
+      const ds = this.depSum(o, depQ);
+      const l = dqRows.filter(r => r.obra === o);
+      const mat = sum(l), matPag = sum(l.filter(r => r.bucket === 'PAGADO'));
+      const saldo = ds.disp - mat;
+      // saldo acumulado: depósitos de quincenas anteriores menos materiales anteriores
+      const prevDisp = st.deposits.filter(d => d.obra === o && d.q < depQ).reduce((a, d) => a + d.monto - d.mo - d.he - d.ot, 0);
+      const prevMat = sum(vivas.filter(r => r.obra === o && r.fechaCaptura < dqS));
+      const ant = prevDisp - prevMat, acum = ant + saldo;
+      tAnt += ant;
+      tDep += ds.monto; tAsig += ds.mo + ds.he + ds.ot; tDisp += ds.disp; tMat += mat;
+      const pct = ds.disp > 0 ? mat / ds.disp * 100 : (mat > 0 ? 100 : 0);
+      const over = saldo < 0;
+      return {
+        name: o, sinDep: ds.n === 0, _dep: ds.monto, _mo: ds.mo, _he: ds.he, _ot: ds.ot, _disp: ds.disp, _mat: mat, _saldo: saldo,
+        depTxt: this.money(ds.monto), moTxt: this.money(ds.mo), heTxt: this.money(ds.he), otTxt: this.money(ds.ot),
+        dispTxt: this.money(ds.disp), matTxt: this.money(mat), nOc: l.length,
+        matPagTxt: this.money(matPag), matPendTxt: this.money(mat - matPag),
+        saldoTxt: (saldo < 0 ? '−' : '') + this.money(Math.abs(saldo)),
+        antTxt: (ant < 0 ? '−' : '+') + this.money(Math.abs(ant)), acumTxt: (acum < 0 ? '−' : '+') + this.money(Math.abs(acum)), _acum: acum,
+        acumStyle: 'font-family:\'IBM Plex Mono\',monospace;font-weight:700;font-size:18px;color:' + (acum < 0 ? '#9F1D12' : '#14532D'),
+        saldoStyle: 'font-family:\'IBM Plex Mono\',monospace;font-weight:700;font-size:16px;color:' + (over ? '#9F1D12' : '#14532D'),
+        estado: ds.n === 0 ? 'Sin depósito registrado en esta quincena' : over ? 'Materiales rebasan lo disponible' : pct.toFixed(0) + '% de lo disponible usado en materiales',
+        estadoStyle: 'font-size:12px;font-weight:600;color:' + (ds.n === 0 ? '#5B5F68' : over ? '#9F1D12' : pct >= 80 ? '#7A4A00' : '#14532D'),
+        barStyle: 'height:100%;border-radius:4px;width:' + Math.min(pct, 100) + '%;background:' + (over ? '#B42318' : pct >= 80 ? '#B45309' : '#1F6F43')
+      };
+    }).sort((a, b) => (a.sinDep - b.sinDep) || a.name.localeCompare(b.name));
+    const tSaldo = tDisp - tMat;
+    const tAcum = tAnt + tSaldo;
+    const df = st.depForm;
+    const depList = dqDeps.slice().sort((a, b) => a.fecha.localeCompare(b.fecha)).map(d => ({
+      fechaTxt: this.fd(d.fecha).slice(0, 5), obra: d.obra, montoTxt: this.money(d.monto),
+      asigTxt: 'Mano de obra ' + this.money(d.mo) + ' · Utilidad ' + this.money(d.ot),
+      dispTxt: this.money(d.monto - d.mo - d.he - d.ot), nota: d.nota,
+      onDel: () => { this.setState(s => ({ deposits: s.deposits.filter(x => x.id !== d.id) })); if (this.db) this.db.doc('depositos/' + d.id).delete().catch(e => this.dbErr(e)); }
+    }));
+    const dfDisp = this.num(df.monto) - this.num(df.mo) - this.num(df.he) - this.num(df.ot);
+
+    // ===== reportes ejecutivos =====
+    const R = st.report;
+    const pctOf = (a, b) => b ? (a / b * 100).toFixed(0) + '%' : '—';
+    const signed = (n) => (n < 0 ? '−' : '') + this.money(Math.abs(n));
+    const ahora = new Date();
+    const generado = this.fd(hoy) + ' ' + this.pad(ahora.getHours()) + ':' + this.pad(ahora.getMinutes());
+    const wkNum = (() => { const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 3); const y1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y1) / 86400000 - 3 + ((y1.getDay() + 6) % 7)) / 7); })();
+    let repTitle = '', repSub = '', repKpis = [], repPoints = [];
+    const K = (label, value, sub, dark) => ({ label, value, sub: sub || '', style: dark ? 'background:#15171C;color:#F3F2EE;border-radius:8px;padding:14px 16px' : 'background:#F6F5F1;border-radius:8px;padding:14px 16px' });
+    // semana
+    const semTot = sum(weekRows), semPag = sum(weekRows.filter(r => r.bucket === 'PAGADO'));
+    const repSemObras = weekObras.slice().sort((a, b) => b._total - a._total).map(o => ({
+      name: o.name, n: o.items.length, totalTxt: o.totalTxt, pct: pctOf(o._total, semTot),
+      ocs: o.items.map(r => r.oc + ' ' + r.montoTxt).join(' · '),
+      barStyle: 'height:8px;border-radius:4px;background:#1E3A8A;width:' + (semTot ? o._total / semTot * 100 : 0) + '%'
+    }));
+    const repMes = monthObras.map(o => Object.assign({}, o));
+    if (R === 'semana') {
+      repTitle = 'Reporte semanal de compras por obra';
+      repSub = 'Semana ' + wkNum + ' · del ' + weekLabel + ' · quincena ' + qLabel;
+      repKpis = [K('Comprado en la semana', this.money(semTot), weekRows.length + ' OCs · ' + weekObras.length + ' obras', true), K('Pagado', this.money(semPag), pctOf(semPag, semTot) + ' del total'), K('Pendiente de pago / autorización', this.money(semTot - semPag), ''), K('Gastado en ' + mesLabel, this.money(mesG), 'disponible materiales ' + this.money(mesP))];
+      if (repSemObras.length) repPoints.push('La obra con más compra fue ' + repSemObras[0].name + ' con ' + repSemObras[0].totalTxt + ' (' + repSemObras[0].pct + ' de la semana).');
+      repPoints.push('Se enviaron ' + weekRows.length + ' órdenes de compra por ' + this.money(semTot) + '; pagado ' + this.money(semPag) + ' y pendiente ' + this.money(semTot - semPag) + '.');
+      const reb = monthObras.filter(o => o._pm > 0 && o._gm > o._pm).map(o => o.name);
+      const sinD = monthObras.filter(o => !o._pm && o._gm > 0).map(o => o.name);
+      if (reb.length) repPoints.push('Rebasan lo disponible para materiales en ' + mesLabel + ': ' + reb.join(', ') + '.');
+      if (sinD.length) repPoints.push('Con compras pero sin depósito registrado en el mes: ' + sinD.join(', ') + '.');
+    }
+    // depositos
+    const repDepRows = saldoObras;
+    const tMo = sum(saldoObras.map(o => ({ monto: o._mo }))), tHe = sum(saldoObras.map(o => ({ monto: o._he }))), tOt = sum(saldoObras.map(o => ({ monto: o._ot })));
+    if (R === 'depositos') {
+      repTitle = 'Depósitos de clientes y saldo por obra';
+      repSub = this.qLabelOf(depQ);
+      repKpis = [K('Depositado por clientes', this.money(tDep), dqDeps.length + ' depósitos'), K('Mano de obra · utilidad', this.money(tAsig), pctOf(tAsig, tDep) + ' del depósito'), K('Disponible para materiales', this.money(tDisp), ''), K('Materiales comprados (OCs)', this.money(tMat), pctOf(tMat, tDisp) + ' del disponible'), K('Saldo de la quincena', signed(tSaldo), tSaldo < 0 ? 'rebasado' : 'a favor', true)];
+      const reb = saldoObras.filter(o => !o.sinDep && o._saldo < 0);
+      const sinD = saldoObras.filter(o => o.sinDep && o._mat > 0);
+      const fav = saldoObras.filter(o => !o.sinDep && o._saldo >= 0).sort((a, b) => b._saldo - a._saldo);
+      repPoints.push('Saldo de la quincena: ' + signed(tSaldo) + ' (depósitos ' + this.money(tDep) + ' menos mano de obra, utilidad y materiales).');
+      if (reb.length) repPoints.push('Obras donde los materiales rebasan lo disponible: ' + reb.map(o => o.name + ' (' + o.saldoTxt + ')').join(', ') + '.');
+      if (sinD.length) repPoints.push('Obras con compras sin depósito registrado: ' + sinD.map(o => o.name + ' (' + o.matTxt + ')').join(', ') + '.');
+      if (fav.length) repPoints.push('Mayor saldo a favor: ' + fav[0].name + ' con ' + fav[0].saldoTxt + '.');
+    }
+    // personal
+    if (R === 'personal') {
+      repTitle = 'Estado de cuenta · pagos con cuentas personales';
+      repSub = 'Manuel Castillo · corte al ' + this.fd(hoy);
+      repKpis = [K('Pagado con cuentas personales', this.money(sum(pers)), pers.length + ' OCs'), K('Devuelto por CASYCO', this.money(sum(persDev)), persDev.length + ' OCs'), K('Saldo por devolver', this.money(sum(persPend)), persPend.length + ' OCs', true)];
+      repPoints.push('CASYCO debe devolver ' + this.money(sum(persPend)) + ' a Manuel Castillo por ' + persPend.length + ' pagos hechos con cuentas personales.');
+      const po = persObras.slice().map(o => ({ name: o.name, t: sum(persPend.filter(r => r.obra === o.name)) })).sort((a, b) => b.t - a.t);
+      if (po.length) repPoints.push('La obra con mayor saldo por devolver es ' + po[0].name + ' con ' + this.money(po[0].t) + ' (' + pctOf(po[0].t, sum(persPend)) + ').');
+      if (persPend.length) repPoints.push('El pago pendiente más antiguo es ' + persPend[0].oc + ' (' + persPend[0].obra + ') del ' + this.fd(persPend[0].fechaPago) + ', hace ' + persPend[0].diasDev + ' días.');
+    }
+
+    // ===== estados de cuenta por banco (Santander / Banorte) =====
+    const BKS = { santander: 'SANTANDER', banorte: 'BANORTE' };
+    const bkKey = BKS[R] ? R : (BKS[st.tab] ? st.tab : 'santander');
+    const BKN = BKS[bkKey];
+    const bkNombre = BKN === 'SANTANDER' ? 'Santander' : 'Banorte';
+    const bkPaga = this.PAGA[BKN];
+    const bkRows = rows.filter(r => r.bucket === 'PAGADO' && r.banco === BKN).sort((a, b) => a.fechaPago.localeCompare(b.fechaPago) || a.oc.localeCompare(b.oc));
+    const bkTot = sum(bkRows);
+    const cq = curQ.split('|'), cqS = cq[0] + (cq[1] === 'q1' ? '-01' : '-16'), cqE = cq[0] + (cq[1] === 'q1' ? '-15' : '-31');
+    const bkQ = bkRows.filter(r => r.fechaPago >= cqS && r.fechaPago <= cqE);
+    const bkM = bkRows.filter(r => r.fechaPago.slice(0, 7) === hoy.slice(0, 7));
+    let bkRun = 0;
+    const bkMovs = bkRows.map(r => { bkRun += r.monto; return { fechaTxt: this.fd(r.fechaPago), oc: r.oc, obra: r.obra, proveedor: r.proveedor, montoTxt: r.montoTxt, acumTxt: this.money(bkRun) }; }).reverse();
+    const bkObras = Array.from(new Set(bkRows.map(r => r.obra))).map(o => { const l = bkRows.filter(r => r.obra === o); const t = sum(l); return { name: o, n: l.length, t, totalTxt: this.money(t), pct: pctOf(t, bkTot) }; }).sort((a, b) => b.t - a.t);
+    const bkQLabel = this.qLabelOf(curQ);
+    const bkMesLabel = MES[Number(hoy.slice(5, 7)) - 1] + ' ' + hoy.slice(0, 4);
+    if (BKS[R]) {
+      repTitle = 'Estado de cuenta · pagos con cuenta ' + bkNombre;
+      repSub = 'Pagó: ' + bkPaga + ' · corte al ' + this.fd(hoy);
+      repKpis = [K('Total pagado', this.money(bkTot), bkRows.length + ' pagos', true), K('Pagado en ' + bkMesLabel, this.money(sum(bkM)), bkM.length + ' pagos'), K('Pagado en la ' + bkQLabel, this.money(sum(bkQ)), bkQ.length + ' pagos')];
+      repPoints.push('Con la cuenta ' + bkNombre + ' se han pagado ' + this.money(bkTot) + ' en ' + bkRows.length + ' órdenes de compra.');
+      if (bkObras.length) repPoints.push('La obra con más pagos es ' + bkObras[0].name + ' con ' + bkObras[0].totalTxt + ' (' + bkObras[0].pct + ').');
+      if (bkRows.length) { const u = bkRows[bkRows.length - 1]; repPoints.push('Último pago: ' + u.oc + ' (' + u.obra + ', ' + u.proveedor + ') por ' + u.montoTxt + ' el ' + this.fd(u.fechaPago) + '.'); }
+    }
+
+    const f = st.form;
+    return {
+      isBanco: !!BKS[st.tab] && !R, isRepBanco: !!BKS[R], bkNombre, bkPaga, bkTotTxt: this.money(bkTot), bkN: bkRows.length,
+      bkQTxt: this.money(sum(bkQ)), bkQN: bkQ.length, bkQLabel, bkMTxt: this.money(sum(bkM)), bkMN: bkM.length, bkMesLabel,
+      bkMovs, bkObras, bkEmpty: bkRows.length === 0,
+      repBanco: () => this.setState({ report: bkKey }),
+      inReport: !!R, isRepSemana: R === 'semana', isRepDep: R === 'depositos', isRepPers: R === 'personal',
+      repTitle, repSub, repKpis, repPoints, repGenerado: generado,
+      repSemObras, repSemTotTxt: this.money(semTot), repSemN: weekRows.length, repMes, repMesEmpty: repMes.length === 0,
+      repDepRows, repTMoTxt: this.money(tMo), repTHeTxt: this.money(tHe), repTOtTxt: this.money(tOt),
+      repSemana: () => this.setState({ report: 'semana' }), repDep: () => this.setState({ report: 'depositos' }), repPers: () => this.setState({ report: 'personal' }),
+      cerrarRep: () => this.setState({ report: null }),
+      imprimir: () => { try { window.print(); } catch (e) {} },
+      userEmail: st.userEmail || '', salir: () => window.__salir && window.__salir(),
+      isLoading: !st.loaded, sinDb: st.loaded && !st.dbOk, hasDbMsg: !!st.dbMsg, dbMsg: st.dbMsg, cerrarDbMsg: () => this.setState({ dbMsg: '' }),
+      isDepositos: st.tab === 'depositos' && !st.report,
+      qOpts, depQ, depQLabel: this.qLabelOf(depQ), onDepQ: (e) => this.setState({ depQ: e.target.value }),
+      depForm: df, depFormQ: df.q || this.qKeyOf(df.fecha || hoy), depFormFecha: df.fecha || hoy,
+      onDepObra: (e) => this.setDep('obra', e.target.value), onDepQForm: (e) => this.setDep('q', e.target.value),
+      onDepFecha: (e) => this.setDep('fecha', e.target.value), onDepMonto: (e) => this.setDep('monto', e.target.value),
+      onDepMo: (e) => this.setDep('mo', e.target.value), onDepHe: (e) => this.setDep('he', e.target.value),
+      onDepOt: (e) => this.setDep('ot', e.target.value), onDepNota: (e) => this.setDep('nota', e.target.value),
+      dfDispTxt: this.money(dfDisp), dfDispStyle: 'font-family:\'IBM Plex Mono\',monospace;font-size:20px;font-weight:700;color:' + (dfDisp < 0 ? '#9F1D12' : '#15171C'),
+      submitDep: () => this.submitDep(),
+      hasDepMsg: !!st.depMsg, depMsg: st.depMsg,
+      depMsgStyle: 'margin:14px 0 0;padding:10px 12px;border-radius:6px;font-size:14px;font-weight:600;' + (st.depOk ? 'background:#DCEFE4;color:#14532D' : 'background:#FBE0DC;color:#9F1D12'),
+      saldoObras, saldoEmpty: saldoObras.length === 0, depList, depListEmpty: depList.length === 0,
+      tDepTxt: this.money(tDep), tAsigTxt: this.money(tAsig), tDispTxt: this.money(tDisp), tMatTxt: this.money(tMat),
+      tSaldoTxt: (tSaldo < 0 ? '−' : '') + this.money(Math.abs(tSaldo)),
+      tAntTxt: (tAnt < 0 ? '−' : '+') + this.money(Math.abs(tAnt)), tAcumTxt: (tAcum < 0 ? '−' : '+') + this.money(Math.abs(tAcum)),
+      tAcumStyle: 'font-family:\'IBM Plex Mono\',monospace;font-size:22px;font-weight:700;margin-top:6px;color:' + (tAcum < 0 ? '#F87171' : '#86EFAC'),
+      tSaldoStyle: 'font-family:\'IBM Plex Mono\',monospace;font-size:22px;font-weight:700;margin-top:6px;color:' + (tSaldo < 0 ? '#F87171' : '#86EFAC'),
+      isPersonal: st.tab === 'personal' && !st.report,
+      persTotalTxt: this.money(sum(pers)), persN: pers.length,
+      persDevTxt: this.money(sum(persDev)), persDevN: persDev.length,
+      persPendTxt: this.money(sum(persPend)), persPendN: persPend.length, persPendEmpty: persPend.length === 0,
+      persPend, persDev, persDevEmpty: persDev.length === 0, edoCta, edoEmpty: edoCta.length === 0, persObras,
+      mesLabel, monthObras, monthEmpty: monthObras.length === 0,
+      mesGTxt: this.money(mesG), mesPTxt: this.money(mesP), mesSTxt: ms.t, mesSStyle: ms.s,
+      hoyTxt: this.fd(hoy), tabs,
+      isCaptura: st.tab === 'captura' && !st.report, isFiltro: st.tab === 'filtro' && !st.report, isFinanzas: st.tab === 'finanzas' && !st.report, isSemana: st.tab === 'semana' && !st.report,
+      form: f,
+      onOc: (e) => this.setForm('oc', e.target.value), onMonto: (e) => this.setForm('monto', e.target.value),
+      onProv: (e) => this.setForm('proveedor', e.target.value), onObra: (e) => this.setForm('obra', e.target.value),
+      onSol: (e) => this.setForm('solicita', e.target.value), onNotas: (e) => this.setForm('notas', e.target.value),
+      onDiv: (e) => this.setForm('division', e.target.value),
+      autorizaForm: this.AUTORIZA[f.division],
+      proveedores: (st.proveedoresCat || []).map(p => ({ v: p.nombreComercial })).sort((a, b) => a.v.localeCompare(b.v)),
+      solicitantes: (st.solicitantesCat || []).map(p => ({ v: p.nombre })).sort((a, b) => a.v.localeCompare(b.v)),
+      hasProvInfo: !!f.proveedor.trim(),
+      provInfo: (() => { const p = this.provBuscarNombre(f.proveedor); if (!p) return 'No está registrado. Regístralo en Catálogos antes de enviar la OC.'; const fl = this.provFaltan(p); return (p.nombreComercial !== f.proveedor.trim().toUpperCase() ? p.nombreComercial + ' · ' : '') + (p.banco || 'sin banco') + ' · CLABE ' + (p.clabe || '—') + ' · ' + (p.beneficiario || 'sin razón social') + (fl.length ? ' · INCOMPLETO: falta ' + fl.join(', ') : ''); })(),
+      provInfoStyle: 'font-size:12px;font-weight:600;color:' + ((() => { const p = this.provBuscarNombre(f.proveedor); return !p ? '#9F1D12' : (this.provFaltan(p).length ? '#7A4A00' : '#14532D'); })()),
+      editandoOC: !!st.editId, formTitulo: st.editId ? 'Editando OC ' + ((st.rows.find(x => x.id === st.editId) || {}).oc || '') : 'Enviar OC al filtro',
+      submitTxt: st.editId ? 'Guardar cambios de la OC' : 'Enviar al filtro de dirección',
+      cancelarEdicion: () => this.setState({ editId: '', formMsg: '', form: { oc: '', monto: '', proveedor: '', obra: '', division: 'HOTELERIA', solicita: st.form.solicita, notas: '' } }),
+      onProvRfc: (e) => this.setCat('catProv', 'rfc', e.target.value.toUpperCase()),
+      rfcHint: !st.catProv.rfc ? 'Opcional, pero sin RFC queda incompleto.' : (this.rfcOk(st.catProv.rfc.trim()) ? 'RFC con formato válido' : 'Formato de RFC no válido'),
+      rfcHintStyle: 'font-size:12px;font-weight:600;color:' + (!st.catProv.rfc ? '#5B5F68' : (this.rfcOk(st.catProv.rfc.trim()) ? '#14532D' : '#9F1D12')),
+      provBuscar: st.provBuscar, onProvBuscar: (e) => this.setState({ provBuscar: e.target.value }),
+      provFiltros: [['TODOS', 'Todos'], ['COMPLETOS', 'Completos'], ['INCOMPLETOS', 'Incompletos']].map(c => ({ label: c[1], n: (st.proveedoresCat || []).filter(p => c[0] === 'TODOS' || (c[0] === 'COMPLETOS') === !this.provFaltan(p).length).length,
+        go: () => this.setState({ provFiltro: c[0] }), style: 'min-height:40px;padding:0 14px;border-radius:20px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;' + (st.provFiltro === c[0] ? 'background:#15171C;color:#FFFFFF;border:1px solid #15171C' : 'background:#FFFFFF;color:#15171C;border:1px solid #B9B7AF') })),
+      hasObraInfo: !!f.obra.trim() && !st.obraDiv[f.obra.trim().toUpperCase()], obraInfo: 'Obra no registrada. Agrégala en Catálogos.',
+      hasSolInfo: !!f.solicita.trim() && !(st.solicitantesCat || []).some(p => p.nombre === f.solicita.trim().toUpperCase()), solInfo: 'Nombre no registrado. Agrégalo en Catálogos.',
+      canAutorizar: esDir, noAutoriza: !esDir, canPagar: esDir || esConta, esDireccion: esDir, canBorrarCat: esDir || esConta,
+      sinRol: !!st.loaded && !rol,
+      isCatalogos: st.tab === 'catalogos' && !st.report,
+      hasCatMsg: !!st.catMsg, catMsg: st.catMsg,
+      catMsgStyle: 'margin:0 0 16px;padding:10px 12px;border-radius:6px;font-size:14px;font-weight:600;' + (st.catOk ? 'background:#DCEFE4;color:#14532D' : 'background:#FBE0DC;color:#9F1D12'),
+      catProv: st.catProv, catObra: st.catObra, catSol: st.catSol, rolForm: st.rolForm,
+      onProvCom: (e) => this.setCat('catProv', 'nombreComercial', e.target.value), onProvBen: (e) => this.setCat('catProv', 'beneficiario', e.target.value),
+      onProvClabe: (e) => this.setCat('catProv', 'clabe', e.target.value), onProvBanco: (e) => this.setCat('catProv', 'banco', e.target.value),
+      clabeHint: !st.catProv.clabe ? 'Opcional, pero sin CLABE queda incompleto.' : (st.catProv.clabe.length < 18 ? st.catProv.clabe.length + ' de 18 dígitos' : (this.clabeOk(st.catProv.clabe) ? 'CLABE válida' : 'CLABE no válida: revisa los dígitos')),
+      clabeHintStyle: 'font-size:12px;font-weight:600;color:' + (!st.catProv.clabe || st.catProv.clabe.length < 18 ? '#5B5F68' : (this.clabeOk(st.catProv.clabe) ? '#14532D' : '#9F1D12')),
+      guardarProv: () => this.guardarProv(), provBtnTxt: st.catProv.id ? 'Guardar cambios' : 'Registrar proveedor', editandoProv: !!st.catProv.id,
+      cancelarProv: () => this.setState({ catProv: { id: '', nombreComercial: '', beneficiario: '', rfc: '', banco: '', clabe: '' }, catMsg: '' }),
+      provLista: (st.proveedoresCat || []).filter(p => { const inc = this.provFaltan(p).length > 0; if (st.provFiltro === 'COMPLETOS' && inc) return false; if (st.provFiltro === 'INCOMPLETOS' && !inc) return false;
+        const q = (st.provBuscar || '').trim().toUpperCase(); return !q || [p.nombreComercial, p.beneficiario, p.rfc].concat(p.alias || []).join(' ').toUpperCase().indexOf(q) >= 0; })
+        .sort((a, b) => a.nombreComercial.localeCompare(b.nombreComercial)).map(p => ({
+        rfc: p.rfc || 'Sin RFC', hasAlias: !!(p.alias && p.alias.length), aliasTxt: (p.alias || []).join(', '),
+        estadoTxt: this.provFaltan(p).length ? 'Incompleto: ' + this.provFaltan(p).join(', ') : 'Completo',
+        estadoStyle: 'display:inline-block;padding:3px 8px;border-radius:4px;font-size:12px;font-weight:600;' + (this.provFaltan(p).length ? 'background:#FDF0D5;color:#7A4A00' : 'background:#DCEFE4;color:#14532D'),
+        nombreComercial: p.nombreComercial, beneficiario: p.beneficiario, banco: p.banco, clabeFmt: String(p.clabe || '').replace(/(\d{3})(\d{3})(\d{11})(\d)/, '$1 $2 $3 $4'),
+        editar: () => { this.setState({ catProv: { id: p.id, nombreComercial: p.nombreComercial, beneficiario: p.beneficiario || '', rfc: p.rfc || '', banco: p.banco || '', clabe: p.clabe || '' }, catMsg: '' }); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} },
+        borrar: () => { this.setState(s => ({ proveedoresCat: s.proveedoresCat.filter(x => x.id !== p.id) })); if (this.db) this.db.doc('proveedores/' + p.id).delete().catch(e => this.dbErr(e)); this.catAviso('Proveedor ' + p.nombreComercial + ' borrado.', true); }
+      })),
+      provSinDatos: Array.from(new Set(st.rows.map(r => r.proveedor))).filter(n => n && !this._provMap[n]).sort().map(n => ({ nombre: n, completar: () => this.setState({ catProv: { id: '', nombreComercial: n, beneficiario: '', rfc: '', banco: '', clabe: '' }, catMsg: '' }) })),
+      hasProvSinDatos: st.rows.some(r => r.proveedor && !this._provMap[r.proveedor]),
+      onObraNom: (e) => this.setCat('catObra', 'nombre', e.target.value), onObraDiv: (e) => this.setCat('catObra', 'division', e.target.value), guardarObra: () => this.guardarObra(),
+      obraLista: Object.keys(st.obraDiv).sort().map(k => ({ nombre: k, division: st.obraDiv[k] === 'INDUSTRIAL' ? 'Industrial' : 'Hotelería' })),
+      onSolNom: (e) => this.setCat('catSol', 'nombre', e.target.value), onSolPue: (e) => this.setCat('catSol', 'puesto', e.target.value), guardarSol: () => this.guardarSol(),
+      solLista: (st.solicitantesCat || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre)).map(p => ({ nombre: p.nombre, puesto: p.puesto || '',
+        borrar: () => { this.setState(s => ({ solicitantesCat: s.solicitantesCat.filter(x => x.id !== p.id) })); if (this.db) this.db.doc('solicitantes/' + p.id).delete().catch(e => this.dbErr(e)); } })),
+      onRolMail: (e) => this.setCat('rolForm', 'email', e.target.value), onRolNom: (e) => this.setCat('rolForm', 'nombre', e.target.value), onRolRol: (e) => this.setCat('rolForm', 'rol', e.target.value),
+      guardarRol: () => this.guardarRol(),
+      rolesLista: (st.rolesList || []).map(u => ({ email: u.email, nombre: u.nombre || '', rolTxt: u.rol === 'direccion' ? 'Dirección' : u.rol === 'contabilidad' ? 'Contabilidad' : 'Compras',
+        quitar: async () => { if (!window.__rolesApi) return; const r = await window.__rolesApi.quitar(u.email); if (r.error) this.catAviso('No se pudo quitar: ' + r.error.message); else { this.catAviso('Permiso quitado a ' + u.email + '.', true); window.__rolesApi.cargar(); } } })),
+      obras: Object.keys(st.obraDiv).sort().map(v => ({ v })),
+      submit: () => this.submit(),
+      hasFormMsg: !!st.formMsg, formMsg: st.formMsg,
+      formMsgStyle: 'margin:16px 0 0;padding:10px 12px;border-radius:6px;font-size:14px;font-weight:600;' + (st.formOk ? 'background:#DCEFE4;color:#14532D' : 'background:#FBE0DC;color:#9F1D12'),
+      recent, rowsCount: rows.length,
+      reviewers, reviewerDiv: revDiv === 'HOTELERIA' ? 'Hotelería' : 'Industrial',
+      isVistaAut: st.filtroVista !== 'pagar', isVistaPagar: st.filtroVista === 'pagar',
+      verAut: () => this.setState({ filtroVista: 'autorizar' }), verPagar: () => this.setState({ filtroVista: 'pagar', flash: '' }),
+      irPagar: () => this.setState({ tab: 'filtro', filtroVista: 'pagar', flash: '', report: null }),
+      vAutStyle: 'min-height:40px;padding:0 14px;border:none;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;' + (st.filtroVista !== 'pagar' ? 'background:#15171C;color:#FFFFFF' : 'background:transparent;color:#15171C'),
+      vPagStyle: 'min-height:40px;padding:0 14px;border:none;border-radius:6px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;' + (st.filtroVista === 'pagar' ? 'background:#15171C;color:#FFFFFF' : 'background:transparent;color:#15171C'),
+      hasFlash: !!st.flash, flash: st.flash, flashVerPagar: !!st.flashPagar, cerrarFlash: () => this.setState({ flash: '', undo: null }),
+      hasUndo: !!(st.undo && st.flash), deshacer: () => { const u = st.undo; if (!u) return; this.upd(u.id, u.prev); this.setState({ flash: 'Se deshizo el último cambio de ' + u.oc + '.', flashPagar: false, undo: null }); },
+      buscar: st.buscar, onBuscar: (e) => this.setState({ buscar: e.target.value }),
+      queue, queueN: queue.length, queueEmpty: queue.length === 0, queueTotalTxt: this.money(sum(queue)),
+      queueLateN: queue.filter(r => r.isCrit).length, queueMaxDias: queue.reduce((m, r) => Math.max(m, r.dias), 0), diasCritico: dC,
+      porPagar, porPagarN: porPagar.length, porPagarTotalTxt: this.money(sum(porPagar)),
+      kpis, byDiv, byBank, pagadoTotalTxt: this.money(sum(paid)), byObra, tot: agg(rows), finChips, detail,
+      weekLabel, qLabel, weekObras,
+      weekNum: (() => { const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 3); const y1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y1) / 86400000 - 3 + ((y1.getDay() + 6) % 7)) / 7); })(), weekEmpty: weekObras.length === 0, weekCount: weekRows.length, weekObrasN: weekObras.length,
+      weekTotalTxt: this.money(sum(weekRows)),
+      prevWeek: () => this.setState(s => ({ weekOffset: s.weekOffset - 1 })),
+      nextWeek: () => this.setState(s => ({ weekOffset: s.weekOffset + 1 })),
+      thisWeek: () => this.setState({ weekOffset: 0 })
+    };
+  }
+}
+
+const TPL = (v) => html`
+<div class="bgpage" style="min-height: 100%; background: #F3F2EE; color: #15171C; font-family: 'IBM Plex Sans', system-ui, sans-serif">
+<header class="noprint" style="background: #15171C; color: #F3F2EE">
+<div style="max-width: 1360px; margin: 0 auto; padding: 18px 24px 10px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap">
+<span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; letter-spacing: 0.1em; color: #F59E0B">CASYCO</span>
+<h1 style="margin: 0; font-size: 21px; font-weight: 600">Filtro de compras</h1>
+</div>
+<div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; color: #C9C7BF"><span style="font-family: 'IBM Plex Mono', monospace">Hoy ${v.hoyTxt}</span><span>${v.userEmail}</span><button type="button" onClick="${v.salir}" style="min-height: 36px; padding: 0 12px; border: 1px solid #5B5F68; border-radius: 6px; background: transparent; color: #F3F2EE; font: inherit; font-size: 13px; cursor: pointer">Salir</button></div>
+</div>
+<nav aria-label="Secciones" style="max-width: 1360px; margin: 0 auto; padding: 6px 24px 0; display: flex; flex-wrap: wrap; gap: 4px">
+${(v.tabs || []).map((t) => html`
+<button type="button" onClick="${t.go}" style="${t.style}">${t.label}${t.hasBadge ? html`<span style="margin-left: 8px; display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 10px; background: #B42318; color: #FFFFFF; font-size: 12px; font-weight: 700">${t.badge}</span>` : null}</button>
+`)}
+</nav>
+</header>
+
+${v.isLoading ? html`<div style="max-width: 1360px; margin: 0 auto; padding: 14px 24px; color: #33363C; font-size: 14px">Cargando datos…</div>` : null}
+${v.sinDb ? html`<div role="alert" style="background: #FBE0DC; color: #9F1D12; padding: 12px 24px; font-size: 14px; font-weight: 600">No hay conexión con la base de datos. Revisa tu internet y vuelve a abrir la app.</div>` : null}
+${v.hasDbMsg ? html`<div role="alert" style="background: #FBE0DC; color: #9F1D12; padding: 12px 24px; font-size: 14px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap"><span>${v.dbMsg}</span><button type="button" onClick="${v.cerrarDbMsg}" style="border: none; background: transparent; color: #9F1D12; font: inherit; text-decoration: underline; cursor: pointer">Cerrar</button></div>` : null}
+<main class="wrap" style="max-width: 1360px; margin: 0 auto; padding: 24px">
+
+
+${v.isCaptura ? html`
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<section style="flex: 1 1 380px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 24px">
+<h2 style="margin: 0 0 4px; font-size: 18px">${v.formTitulo}</h2>
+<p style="margin: 0 0 20px; font-size: 14px; color: #5B5F68">Compras llena sólo esta sección. División, quién autoriza, fecha, alarmas, pago y reportes se llenan solos.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 16px">
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
+<label for="f-oc" class="lb">Orden de compra Odoo</label>
+<input id="f-oc" class="in" value="${v.form.oc}" onInput="${v.onOc}" placeholder="P01790" autocomplete="off" />
+</div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
+<label for="f-monto" class="lb">Monto (con IVA)</label>
+<input id="f-monto" class="in" inputMode="decimal" value="${v.form.monto}" onInput="${v.onMonto}" placeholder="0.00" style="font-family: 'IBM Plex Mono', monospace" />
+</div>
+<div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
+<label for="f-prov" class="lb">Proveedor</label>
+<input id="f-prov" class="in" list="dl-prov" value="${v.form.proveedor}" onInput="${v.onProv}" placeholder="Elige un proveedor registrado" autocomplete="off" />
+${v.hasProvInfo ? html`<div style="${v.provInfoStyle}">${v.provInfo}</div>` : null}
+<datalist id="dl-prov">${(v.proveedores || []).map((p) => html`<option value="${p.v}"></option>`)}</datalist>
+</div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
+<label for="f-obra" class="lb">Obra</label>
+<input id="f-obra" class="in" list="dl-obra" value="${v.form.obra}" onInput="${v.onObra}" placeholder="Vacío = Gastos generales CASYCO" autocomplete="off" />
+${v.hasObraInfo ? html`<div style="font-size: 12px; font-weight: 600; color: #9F1D12">${v.obraInfo}</div>` : null}
+<datalist id="dl-obra">${(v.obras || []).map((o) => html`<option value="${o.v}"></option>`)}</datalist>
+</div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px">
+<label for="f-sol" class="lb">Quién solicita</label>
+<input id="f-sol" class="in" list="dl-sol" value="${v.form.solicita}" onInput="${v.onSol}" placeholder="Elige un nombre registrado" autocomplete="off" />
+${v.hasSolInfo ? html`<div style="font-size: 12px; font-weight: 600; color: #9F1D12">${v.solInfo}</div>` : null}
+<datalist id="dl-sol">${(v.solicitantes || []).map((s) => html`<option value="${s.v}"></option>`)}</datalist>
+</div>
+<div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
+<label for="f-notas" class="lb">Observaciones o notas</label>
+<textarea id="f-notas" class="in" rows="3" value="${v.form.notas}" onInput="${v.onNotas}" placeholder="Ej. pago por estrategia, material suministrado, entrega parcial…" style="resize: vertical; min-height: 88px"></textarea>
+</div>
+</div>
+<div style="margin-top: 18px; padding: 14px 16px; background: #F6F5F1; border: 1px dashed #C9C7BF; border-radius: 6px; display: flex; flex-wrap: wrap; gap: 10px 28px; font-size: 14px">
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">DIVISIÓN · AUTO</span>
+<select aria-label="División" value="${v.form.division}" onChange="${v.onDiv}" style="font: inherit; font-weight: 600; border: none; background: transparent; padding: 0; color: #15171C; min-height: 28px">
+<option value="HOTELERIA">HOTELERÍA</option>
+<option value="INDUSTRIAL">INDUSTRIAL</option>
+</select></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">AUTORIZA · AUTO</span><span style="font-weight: 600; line-height: 28px">${v.autorizaForm}</span></div>
+<div style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">FECHA DE ENVÍO · AUTO</span><span style="font-weight: 600; line-height: 28px; font-family: 'IBM Plex Mono', monospace">${v.hoyTxt}</span></div>
+</div>
+${v.hasFormMsg ? html`
+<p role="status" style="${v.formMsgStyle}">${v.formMsg}</p>
+` : null}
+<button type="button" onClick="${v.submit}" style="margin-top: 18px; width: 100%; min-height: 48px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">${v.submitTxt}</button>
+${v.editandoOC ? html`<button type="button" onClick="${v.cancelarEdicion}" style="margin-top: 8px; width: 100%; min-height: 44px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Cancelar edición</button>` : null}
+</section>
+
+<section style="flex: 999 1 560px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 24px">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 14px">
+<h2 style="margin: 0; font-size: 18px">OCs enviadas</h2>
+<span style="font-size: 13px; color: #5B5F68">${v.rowsCount} registros · lo más reciente arriba</span>
+</div>
+<div style="max-height: 640px; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc">
+<thead><tr><th>Fecha</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th>Estatus</th><th></th></tr></thead>
+<tbody>
+${(v.recent || []).map((r) => html`
+<tr>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${r.fcCorto}</td>
+<td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
+<td style="overflow-wrap: anywhere"><span style="font-weight: 600">${r.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.proveedor} · ${r.solicita}</span></td>
+<td class="n">${r.montoTxt}</td>
+<td><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasAlarm ? html`<br /><span style="${r.alarmStyle}; margin-top: 4px">${r.alarmTxt}</span>` : null}${r.hasEdit ? html`<div style="margin-top: 4px"><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #FDF0D5; color: #7A4A00">Editada</span> <span style="font-size: 11px; color: #5B5F68">${r.editTxt}</span></div>` : null}</td>
+<td>${r.puedeEditar ? html`<button type="button" onClick="${r.onEditar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Editar</button>` : null}</td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+</div>
+` : null}
+
+
+${v.isFiltro ? html`
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 20px">
+<span style="font-size: 14px; color: #5B5F68; margin-right: 4px">Revisando como</span>
+${(v.reviewers || []).map((rv) => html`
+<button type="button" onClick="${rv.go}" style="${rv.style}">${rv.name} · ${rv.div} <span style="font-family: 'IBM Plex Mono', monospace; margin-left: 6px">(${rv.n})</span></button>
+`)}
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px">
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Por autorizar · ${v.reviewerDiv}</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; margin-top: 6px">${v.queueTotalTxt}</div>
+<div style="font-size: 13px; color: #5B5F68; margin-top: 2px">${v.queueN} órdenes</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Con retraso crítico (≥ ${v.diasCritico} días)</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; margin-top: 6px; color: #9F1D12">${v.queueLateN}</div>
+<div style="font-size: 13px; color: #5B5F68; margin-top: 2px">el más antiguo lleva ${v.queueMaxDias} días</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Autorizado sin pagar · todas</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; margin-top: 6px; color: #1E3A8A">${v.porPagarTotalTxt}</div>
+<div style="font-size: 13px; color: #5B5F68; margin-top: 2px">${v.porPagarN} órdenes</div>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 14px">
+<div role="tablist" aria-label="Vista del filtro" style="display: flex; gap: 4px; background: #E6E4DD; padding: 4px; border-radius: 8px">
+<button type="button" role="tab" onClick="${v.verAut}" style="${v.vAutStyle}">Por autorizar (${v.queueN})</button>
+<button type="button" role="tab" onClick="${v.verPagar}" style="${v.vPagStyle}">Autorizado · por pagar (${v.porPagarN})</button>
+</div>
+<input class="in" type="search" aria-label="Buscar OC, obra o proveedor" value="${v.buscar}" onInput="${v.onBuscar}" placeholder="Buscar OC, obra o proveedor (ej. 1942)" style="max-width: 340px; flex: 1 1 240px" />
+</div>
+${v.hasFlash ? html`
+<div role="status" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #DCEFE4; color: #14532D; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; font-weight: 600">
+<span>${v.flash}</span>
+<span style="display: flex; gap: 8px">${v.hasUndo ? html`<button type="button" onClick="${v.deshacer}" style="min-height: 34px; padding: 0 12px; border: 1px solid #9F1D12; border-radius: 5px; background: #FFFFFF; color: #9F1D12; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Deshacer</button>` : null}${v.flashVerPagar ? html`<button type="button" onClick="${v.verPagar}" style="min-height: 34px; padding: 0 12px; border: 1px solid #14532D; border-radius: 5px; background: #FFFFFF; color: #14532D; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Ir a por pagar</button>` : null}<button type="button" onClick="${v.cerrarFlash}" aria-label="Cerrar aviso" style="min-height: 34px; padding: 0 10px; border: none; background: transparent; color: #14532D; font: inherit; font-size: 13px; cursor: pointer">Cerrar</button></span>
+</div>
+` : null}
+${v.isVistaAut ? html`
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px">
+<h2 style="margin: 0; font-size: 18px">Por autorizar · ${v.reviewerDiv}</h2>
+</div>
+${v.queueEmpty ? html`
+<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 20px; margin: 0 0 28px; color: #5B5F68">No hay órdenes pendientes para esta división.</p>
+` : null}
+<div style="max-height: 65vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; margin-bottom: 32px">
+<table class="t tc">
+<thead><tr><th>OC · enviada</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th>Estatus · observaciones</th><th>Acción</th></tr></thead>
+<tbody>
+${(v.queue || []).map((r) => html`
+<tr>
+<td style="white-space: nowrap"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${r.oc}</span> <span style="font-size: 11px; color: #5B5F68">${r.fcCorto}</span><br /><span style="${r.alarmStyle}; margin-top: 4px">${r.alarmTxt}</span></td>
+<td style="overflow-wrap: anywhere"><span style="font-weight: 600">${r.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.proveedor} · ${r.solicita}</span></td>
+<td class="n" style="font-weight: 600">${r.montoTxt}</td>
+<td style="min-width: 160px"><span style="${r.chipStyle}">${r.chipLabel}</span>${r.hasEdit ? html`<div style="margin-top: 4px"><span style="display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; background: #FDF0D5; color: #7A4A00">Editada</span> <span style="font-size: 11px; color: #5B5F68">${r.editTxt}</span></div>` : null}${r.hasNotas ? html`<div style="font-size: 12px; color: #33363C; margin-top: 4px">${r.notas}</div>` : null}
+<input class="in" aria-label="Nota de dirección" value="${r.notaDir}" onInput="${r.onNota}" placeholder="Nota de dirección" style="font-size: 12px; padding: 4px 8px; min-height: 30px; margin-top: 6px" /></td>
+<td>${v.noAutoriza ? html`<span style="font-size: 12px; color: #5B5F68">En espera de dirección</span>` : null}${v.canAutorizar ? html`<div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 230px">
+<button type="button" onClick="${r.onAut}" style="min-height: 34px; padding: 0 12px; border: none; border-radius: 5px; background: #1F6F43; color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer">Autorizar</button>
+<button type="button" onClick="${r.onRev}" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #B45309; color: #7A4A00">Rev. obra</button>
+<button type="button" onClick="${r.onSinPago}" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #6D28D9; color: #4C1D95">Sin pago</button>
+<button type="button" onClick="${r.onCancel}" aria-label="Cancelar OC" style="min-height: 34px; padding: 0 8px; border-radius: 5px; background: #FFFFFF; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; border: 1px solid #DDDBD4; color: #9F1D12">Cancelar</button>
+</div>` : null}</td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+
+` : null}
+${v.isVistaPagar ? html`
+<h2 style="margin: 0 0 4px; font-size: 18px">Autorizado · por pagar</h2>
+<p style="margin: 0 0 12px; font-size: 14px; color: #5B5F68">Elige la cuenta y registra el pago: quién pagó se llena solo (Santander y cuentas personales → Manuel Castillo; Banorte → Dulce Castillo).</p>
+<div style="overflow-x: auto; max-height: 65vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t">
+<thead><tr><th>OC</th><th>Obra</th><th>División</th><th>Proveedor</th><th style="text-align: right">Monto</th><th>Autorizada</th><th>Espera</th><th>Cuenta</th><th>Paga</th><th></th></tr></thead>
+<tbody>
+${(v.porPagar || []).map((r) => html`
+<tr>
+<td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
+<td>${r.obra}</td>
+<td>${r.division}</td>
+<td>${r.proveedor}<br /><span style="${r.provCuentaStyle}">${r.provCuenta}</span></td>
+<td class="n">${r.montoTxt}</td>
+<td style="white-space: nowrap"><span style="font-family: 'IBM Plex Mono', monospace">${r.faTxt}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.autoriza}</span></td>
+<td><span style="${r.alarmStyle}">${r.alarmTxt}</span></td>
+<td>${v.canPagar ? html`<select class="in" aria-label="Cuenta de pago" value="${r.bancoSel}" onChange="${r.onBanco}" style="min-width: 170px">
+<option value="SANTANDER">SANTANDER</option>
+<option value="CUENTA PERSONAL">CTA. PERSONAL MANUEL</option>
+<option value="EFECTIVO">EFECTIVO</option>
+<option value="BANORTE">BANORTE</option>
+</select>` : null}</td>
+<td style="white-space: nowrap; font-weight: 600">${r.pagaPreview}</td>
+<td>${v.canPagar ? html`<button type="button" onClick="${r.onPagar}" style="min-height: 44px; padding: 0 14px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap">Registrar pago</button><br /><button type="button" onClick="${r.onRegresar}" style="margin-top: 4px; min-height: 30px; border: none; background: transparent; color: #9F1D12; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; white-space: nowrap">Regresar a por autorizar</button>` : null}</td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+` : null}
+` : null}
+
+
+${v.isFinanzas ? html`
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 28px">
+${(v.kpis || []).map((k) => html`
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 16px">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #33363C"><span aria-hidden="true" style="${k.dotStyle}"></span>${k.label}</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; margin-top: 8px">${k.montoTxt}</div>
+<div style="font-size: 13px; color: #5B5F68; margin-top: 2px">${k.n} órdenes</div>
+</div>
+`)}
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 28px">
+<section style="flex: 999 1 560px; min-width: 0">
+<h2 style="margin: 0 0 12px; font-size: 18px">Por división</h2>
+<div style="overflow-x: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t">
+<thead><tr><th>División</th><th>Autoriza</th><th style="text-align: right">Pagado</th><th style="text-align: right">Aut. por pagar</th><th style="text-align: right">Rev. c/ obra</th><th style="text-align: right">Sin pago cliente</th><th style="text-align: right">Sin revisar</th><th style="text-align: right">Total</th></tr></thead>
+<tbody>
+${(v.byDiv || []).map((d) => html`
+<tr><td style="font-weight: 600">${d.name}</td><td>${d.autoriza}</td><td class="n">${d.PAGADO}</td><td class="n">${d.POR_PAGAR}</td><td class="n">${d.REVISION}</td><td class="n">${d.SIN_PAGO_CLIENTE}</td><td class="n">${d.PENDIENTE}</td><td class="n" style="font-weight: 700">${d.TOTAL}</td></tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+<section style="flex: 1 1 340px; min-width: 0">
+<h2 style="margin: 0 0 12px; font-size: 18px">Pagos por cuenta</h2>
+<div style="overflow-x: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t">
+<thead><tr><th>Cuenta</th><th>Pagó</th><th style="text-align: right">Monto</th></tr></thead>
+<tbody>
+${(v.byBank || []).map((b) => html`
+<tr><td style="font-weight: 600">${b.banco}</td><td>${b.paga}</td><td class="n">${b.totalTxt}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total pagado</td><td></td><td class="n">${v.pagadoTotalTxt}</td></tr></tfoot>
+</table>
+</div>
+</section>
+</div>
+
+<h2 style="margin: 0 0 12px; font-size: 18px">Por obra</h2>
+<div style="overflow-x: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; margin-bottom: 28px">
+<table class="t">
+<thead><tr><th>Obra</th><th>División</th><th style="text-align: right">Pagado</th><th style="text-align: right">Aut. por pagar</th><th style="text-align: right">Rev. c/ obra</th><th style="text-align: right">Sin pago cliente</th><th style="text-align: right">Sin revisar</th><th style="text-align: right">Total</th></tr></thead>
+<tbody>
+${(v.byObra || []).map((d) => html`
+<tr><td style="font-weight: 600">${d.name}</td><td>${d.division}</td><td class="n">${d.PAGADO}</td><td class="n">${d.POR_PAGAR}</td><td class="n">${d.REVISION}</td><td class="n">${d.SIN_PAGO_CLIENTE}</td><td class="n">${d.PENDIENTE}</td><td class="n" style="font-weight: 700">${d.TOTAL}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total</td><td></td><td class="n">${v.tot.PAGADO}</td><td class="n">${v.tot.POR_PAGAR}</td><td class="n">${v.tot.REVISION}</td><td class="n">${v.tot.SIN_PAGO_CLIENTE}</td><td class="n">${v.tot.PENDIENTE}</td><td class="n">${v.tot.TOTAL}</td></tr></tfoot>
+</table>
+</div>
+
+<h2 style="margin: 0 0 12px; font-size: 18px">Detalle</h2>
+${v.hasFlash ? html`
+<div role="status" style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; background: #DCEFE4; color: #14532D; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 14px; font-weight: 600">
+<span>${v.flash}</span>
+<span style="display: flex; gap: 8px">${v.hasUndo ? html`<button type="button" onClick="${v.deshacer}" style="min-height: 34px; padding: 0 12px; border: 1px solid #9F1D12; border-radius: 5px; background: #FFFFFF; color: #9F1D12; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Deshacer</button>` : null}${v.flashVerPagar ? html`<button type="button" onClick="${v.irPagar}" style="min-height: 34px; padding: 0 12px; border: 1px solid #14532D; border-radius: 5px; background: #FFFFFF; color: #14532D; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer">Ir a por pagar</button>` : null}<button type="button" onClick="${v.cerrarFlash}" aria-label="Cerrar aviso" style="min-height: 34px; padding: 0 10px; border: none; background: transparent; color: #14532D; font: inherit; font-size: 13px; cursor: pointer">Cerrar</button></span>
+</div>
+` : null}
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px">
+${(v.finChips || []).map((c) => html`
+<button type="button" onClick="${c.go}" style="${c.style}">${c.label} <span style="font-family: 'IBM Plex Mono', monospace">(${c.n})</span></button>
+`)}
+</div>
+<div style="overflow-x: auto; max-height: 65vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t">
+<thead><tr><th>OC</th><th>Obra</th><th>División</th><th>Proveedor</th><th>Solicita</th><th style="text-align: right">Monto</th><th>Estatus</th><th>Enviada</th><th>Autorizada</th><th>Pagada</th><th>Cuenta · pagó</th><th>Notas</th><th>Acción</th></tr></thead>
+<tbody>
+${(v.detail || []).map((r) => html`
+<tr>
+<td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
+<td>${r.obra}</td><td>${r.division}</td><td>${r.proveedor}</td><td>${r.solicita}</td>
+<td class="n">${r.montoTxt}</td>
+<td><span style="${r.chipStyle}">${r.chipLabel}</span></td>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${r.fcTxt}</td>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${r.faTxt}</td>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${r.fpTxt}</td>
+<td style="white-space: nowrap">${r.cuentaTxt}</td>
+<td style="font-size: 13px; color: #33363C; min-width: 180px">${r.notasAll}</td>
+<td>${r.puedeActuar ? html`<div style="display: flex; flex-direction: column; gap: 4px; min-width: 150px">
+<button type="button" onClick="${r.onAut}" style="min-height: 32px; padding: 0 10px; border: none; border-radius: 5px; background: #1F6F43; color: #FFFFFF; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer">Autorizar</button>
+${r.puedeRegresar ? html`<button type="button" onClick="${r.onRegresar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">${r.regresarTxt}</button>` : null}
+</div>` : null}</td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+` : null}
+
+
+${v.isSemana ? html`
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+<button type="button" onClick="${v.prevWeek}" aria-label="Semana anterior" style="min-width: 44px; min-height: 44px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; cursor: pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></svg></button>
+<div style="padding: 0 8px"><div style="font-size: 20px; font-weight: 700">Semana ${v.weekNum}</div><div style="font-size: 14px; color: #5B5F68">del ${v.weekLabel} · quincena ${v.qLabel}</div></div>
+<button type="button" onClick="${v.nextWeek}" aria-label="Semana siguiente" style="min-width: 44px; min-height: 44px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; cursor: pointer"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"></path></svg></button>
+<button type="button" onClick="${v.thisWeek}" style="min-height: 44px; padding: 0 14px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 14px; cursor: pointer">Esta semana</button>
+<button type="button" onClick="${v.repSemana}" style="min-height: 44px; padding: 0 16px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Generar reporte ejecutivo</button>
+</div>
+<div style="text-align: right"><div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">COMPRADO EN LA SEMANA</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600">${v.weekTotalTxt}</div><div style="font-size: 13px; color: #5B5F68">${v.weekCount} OCs · ${v.weekObrasN} obras</div></div>
+</div>
+
+${v.weekEmpty ? html`
+<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 20px; color: #5B5F68">No se enviaron OCs al filtro esta semana.</p>
+` : null}
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start">
+${(v.weekObras || []).map((o) => html`
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; overflow: hidden">
+<h3 style="margin: 0; padding: 12px 14px; font-size: 16px; background: #15171C; color: #F3F2EE">${o.name}</h3>
+<table class="t tc">
+<thead><tr><th>OC Odoo</th><th style="text-align: right">Monto</th></tr></thead>
+<tbody>
+${(o.items || []).map((r) => html`
+<tr><td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${r.oc}</td><td class="n">${r.montoTxt}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total ${o.name}</td><td class="n">${o.totalTxt}</td></tr></tfoot>
+</table>
+</section>
+`)}
+</div>
+
+<div style="margin-top: 40px; padding-top: 24px; border-top: 2px solid #15171C; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 16px">
+<div><h2 style="margin: 0; font-size: 20px">Quincena y mes por obra · ${v.mesLabel}</h2><p style="margin: 4px 0 0; font-size: 14px; color: #5B5F68">Lo disponible para materiales sale de los depósitos capturados en «Depósitos y saldos» (depósito menos mano de obra y utilidad). Saldo en verde: alcanza; en rojo: se rebasó.</p></div>
+<div style="display: flex; flex-wrap: wrap; gap: 24px; text-align: right">
+<div><div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">GASTADO MES</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600">${v.mesGTxt}</div></div>
+<div><div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">DISPONIBLE MATERIALES</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600">${v.mesPTxt}</div></div>
+<div><div style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">SALDO</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600; ${v.mesSStyle}">${v.mesSTxt}</div></div>
+</div>
+</div>
+${v.monthEmpty ? html`
+<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 20px; color: #5B5F68">Sin gastos registrados en ${v.mesLabel}.</p>
+` : null}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; align-items: start">
+${(v.monthObras || []).map((o) => html`
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; overflow: hidden">
+<h3 style="margin: 0; padding: 12px 14px; font-size: 16px; background: #15171C; color: #F3F2EE">${o.name}</h3>
+<table class="t tc">
+<thead><tr><th>Periodo</th><th style="text-align: right">Gastado</th><th style="text-align: right">Disp. materiales</th><th style="text-align: right">Saldo</th></tr></thead>
+<tbody>
+${(o.qs || []).map((q) => html`
+<tr style="${q.rowStyle}">
+<td style="white-space: nowrap">${q.label}<br /><span style="font-size: 11px; color: #5B5F68">${q.rango}</span></td>
+<td class="n">${q.gTxt}</td>
+<td class="n">${q.pagoTxt}</td>
+<td class="n" style="${q.saldoStyle}">${q.saldoTxt}</td>
+</tr>
+`)}
+</tbody>
+<tfoot><tr><td>Mes</td><td class="n">${o.gmTxt}</td><td class="n">${o.pmTxt}</td><td class="n" style="${o.smStyle}">${o.smTxt}</td></tr></tfoot>
+</table>
+</section>
+`)}
+</div>
+` : null}
+
+
+${v.sinRol ? html`<div role="alert" style="background: #FDF0D5; color: #7A4A00; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; font-size: 14px; font-weight: 600">Tu usuario todavía no tiene permisos asignados. Pide a Manuel que te dé de alta en Catálogos → Usuarios y permisos.</div>` : null}
+${v.inReport ? html`
+<div class="noprint" style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 16px">
+<button type="button" onClick="${v.cerrarRep}" style="min-height: 44px; padding: 0 16px; border: 1px solid #B9B7AF; border-radius: 6px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">← Volver a la app</button>
+<button type="button" onClick="${v.imprimir}" style="min-height: 44px; padding: 0 18px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Imprimir / guardar PDF</button>
+</div>
+<article class="rep" style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 40px 44px; max-width: 1100px; margin: 0 auto">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 18px; border-bottom: 3px solid #15171C">
+<div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13px; letter-spacing: 0.12em; color: #B45309">CASYCO · DESARROLLO E INGENIERÍA</div>
+<h1 style="margin: 8px 0 4px; font-size: 28px; line-height: 1.15">${v.repTitle}</h1>
+<div style="font-size: 16px; color: #33363C">${v.repSub}</div>
+</div>
+<div style="text-align: right; font-size: 12px; color: #5B5F68; line-height: 1.6">Reporte ejecutivo para socios<br />Generado ${v.repGenerado}</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 24px 0">
+${(v.repKpis || []).map((k) => html`
+<div style="${k.style}">
+<div style="font-size: 12px; font-weight: 600; opacity: 0.85">${k.label}</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; margin-top: 6px">${k.value}</div>
+<div style="font-size: 12px; opacity: 0.8; margin-top: 2px">${k.sub}</div>
+</div>
+`)}
+</div>
+
+<section style="margin-bottom: 26px">
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Puntos clave</h2>
+<ul style="margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.6">
+${(v.repPoints || []).map((pt) => html`<li>${pt}</li>`)}
+</ul>
+</section>
+
+${v.isRepSemana ? html`
+<section style="margin-bottom: 26px">
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Compras de la semana por obra</h2>
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">OCs</th><th style="text-align: right">Monto</th><th style="text-align: right">%</th><th style="width: 30%">Participación</th></tr></thead>
+<tbody>
+${(v.repSemObras || []).map((o) => html`
+<tr><td style="font-weight: 600">${o.name}<br /><span style="font-size: 11px; font-weight: 400; color: #5B5F68; font-family: 'IBM Plex Mono', monospace">${o.ocs}</span></td><td class="n">${o.n}</td><td class="n">${o.totalTxt}</td><td class="n">${o.pct}</td><td style="vertical-align: middle"><div style="background: #ECEAE4; border-radius: 4px"><div style="${o.barStyle}"></div></div></td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total semana</td><td class="n">${v.repSemN}</td><td class="n">${v.repSemTotTxt}</td><td class="n">100%</td><td></td></tr></tfoot>
+</table>
+</section>
+<section>
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Quincena y mes por obra · ${v.mesLabel}</h2>
+${v.repMesEmpty ? html`<p style="color: #5B5F68">Sin gastos en el mes.</p>` : null}
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">Gastado 1ª q.</th><th style="text-align: right">Disp. 1ª q.</th><th style="text-align: right">Gastado 2ª q.</th><th style="text-align: right">Disp. 2ª q.</th><th style="text-align: right">Gastado mes</th><th style="text-align: right">Disp. mes</th><th style="text-align: right">Saldo mes</th></tr></thead>
+<tbody>
+${(v.repMes || []).map((o) => html`
+<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.q1g}</td><td class="n">${o.q1p}</td><td class="n">${o.q2g}</td><td class="n">${o.q2p}</td><td class="n">${o.gmTxt}</td><td class="n">${o.pmTxt}</td><td class="n" style="${o.smStyle}">${o.smTxt}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total</td><td></td><td></td><td></td><td></td><td class="n">${v.mesGTxt}</td><td class="n">${v.mesPTxt}</td><td class="n">${v.mesSTxt}</td></tr></tfoot>
+</table>
+</section>
+` : null}
+
+${v.isRepDep ? html`
+<section>
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Saldo por obra</h2>
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">Depósito</th><th style="text-align: right">Mano de obra</th><th style="text-align: right">Utilidad</th><th style="text-align: right">Disp. materiales</th><th style="text-align: right">Materiales</th><th style="text-align: right">Saldo</th></tr></thead>
+<tbody>
+${(v.repDepRows || []).map((o) => html`
+<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.depTxt}</td><td class="n">${o.moTxt}</td><td class="n">${o.otTxt}</td><td class="n">${o.dispTxt}</td><td class="n">${o.matTxt}</td><td class="n" style="${o.saldoStyle}">${o.saldoTxt}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total</td><td class="n">${v.tDepTxt}</td><td class="n">${v.repTMoTxt}</td><td class="n">${v.repTOtTxt}</td><td class="n">${v.tDispTxt}</td><td class="n">${v.tMatTxt}</td><td class="n">${v.tSaldoTxt}</td></tr></tfoot>
+</table>
+</section>
+` : null}
+
+${v.isRepPers ? html`
+<section style="margin-bottom: 26px">
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Saldo por devolver por obra</h2>
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">OCs</th><th style="text-align: right">Por devolver</th></tr></thead>
+<tbody>
+${(v.persObras || []).map((o) => html`<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.n}</td><td class="n">${o.totalTxt}</td></tr>`)}
+</tbody>
+<tfoot><tr><td>Total</td><td class="n">${v.persPendN}</td><td class="n">${v.persPendTxt}</td></tr></tfoot>
+</table>
+</section>
+<section>
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Movimientos</h2>
+<table class="t tc">
+<thead><tr><th>Fecha</th><th>Concepto</th><th>OC · obra · proveedor</th><th style="text-align: right">Cargo</th><th style="text-align: right">Abono</th><th style="text-align: right">Saldo</th></tr></thead>
+<tbody>
+${(v.edoCta || []).map((m) => html`
+<tr style="${m.rowStyle}"><td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${m.fechaTxt}</td><td>${m.concepto}</td><td><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${m.oc}</span> · ${m.obra} · <span style="color: #5B5F68">${m.proveedor}</span></td><td class="n">${m.cargoTxt}</td><td class="n" style="color: #14532D">${m.abonoTxt}</td><td class="n" style="font-weight: 700">${m.saldoTxt}</td></tr>
+`)}
+</tbody>
+</table>
+</section>
+` : null}
+
+${v.isRepBanco ? html`
+<section style="margin-bottom: 26px">
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Pagado por obra</h2>
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">Pagos</th><th style="text-align: right">Monto</th><th style="text-align: right">%</th></tr></thead>
+<tbody>${(v.bkObras || []).map((o) => html`<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.n}</td><td class="n">${o.totalTxt}</td><td class="n">${o.pct}</td></tr>`)}</tbody>
+<tfoot><tr><td>Total</td><td class="n">${v.bkN}</td><td class="n">${v.bkTotTxt}</td><td class="n">100%</td></tr></tfoot>
+</table>
+</section>
+<section>
+<h2 style="margin: 0 0 10px; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: #5B5F68">Movimientos</h2>
+<table class="t tc">
+<thead><tr><th>Fecha pago</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th style="text-align: right">Acumulado</th></tr></thead>
+<tbody>${(v.bkMovs || []).map((m) => html`<tr><td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${m.fechaTxt}</td><td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${m.oc}</td><td>${m.obra} · <span style="color: #5B5F68">${m.proveedor}</span></td><td class="n">${m.montoTxt}</td><td class="n" style="font-weight: 700">${m.acumTxt}</td></tr>`)}</tbody>
+</table>
+</section>
+` : null}
+
+<div style="margin-top: 28px; padding-top: 12px; border-top: 1px solid #DDDBD4; font-size: 11px; color: #5B5F68; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px">
+<span>Fuente: filtro de compras CASYCO · órdenes de compra de Odoo</span>
+<span>Montos con IVA · MXN</span>
+</div>
+</article>
+` : null}
+
+
+${v.isCatalogos ? html`
+${v.hasCatMsg ? html`<p role="status" style="${v.catMsgStyle}">${v.catMsg}</p>` : null}
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section style="flex: 999 1 640px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 4px; font-size: 18px">Proveedores</h2>
+<p style="margin: 0 0 16px; font-size: 14px; color: #5B5F68">Sólo el nombre comercial es obligatorio. Si falta razón social, RFC, CLABE o banco, el proveedor queda marcado como <strong>incompleto</strong> hasta que se completen sus datos.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 12px">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-com" class="lb">Nombre comercial</label><input id="p-com" class="in" value="${v.catProv.nombreComercial}" onInput="${v.onProvCom}" placeholder="FERKAMEX" /></div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-ben" class="lb">Razón social (beneficiario)</label><input id="p-ben" class="in" value="${v.catProv.beneficiario}" onInput="${v.onProvBen}" placeholder="Titular de la cuenta" /></div>
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="p-rfc" class="lb">RFC</label><input id="p-rfc" class="in" value="${v.catProv.rfc}" onInput="${v.onProvRfc}" placeholder="ABC123456XY9" style="font-family: 'IBM Plex Mono', monospace; text-transform: uppercase" /><span style="${v.rfcHintStyle}">${v.rfcHint}</span></div>
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px"><label for="p-clabe" class="lb">CLABE interbancaria (18 dígitos)</label><input id="p-clabe" class="in" inputMode="numeric" value="${v.catProv.clabe}" onInput="${v.onProvClabe}" placeholder="000000000000000000" style="font-family: 'IBM Plex Mono', monospace" /><span style="${v.clabeHintStyle}">${v.clabeHint}</span></div>
+<div style="flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px"><label for="p-banco" class="lb">Banco</label><input id="p-banco" class="in" value="${v.catProv.banco}" onInput="${v.onProvBanco}" placeholder="Se llena con la CLABE" /></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px">
+<button type="button" onClick="${v.guardarProv}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">${v.provBtnTxt}</button>
+${v.editandoProv ? html`<button type="button" onClick="${v.cancelarProv}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; min-height: 40px">Cancelar edición</button>` : null}
+</div>
+${v.hasProvSinDatos ? html`
+<div style="margin-top: 16px; background: #FDF0D5; color: #7A4A00; border-radius: 6px; padding: 10px 12px; font-size: 13px">
+<strong>Proveedores con OCs que no están en el catálogo:</strong>
+<div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px">${(v.provSinDatos || []).map((p) => html`<button type="button" onClick="${p.completar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">${p.nombre} · completar</button>`)}</div>
+</div>
+` : null}
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 18px">
+${(v.provFiltros || []).map((c) => html`<button type="button" onClick="${c.go}" style="${c.style}">${c.label} <span style="font-family: 'IBM Plex Mono', monospace">(${c.n})</span></button>`)}
+<input class="in" type="search" aria-label="Buscar proveedor" value="${v.provBuscar}" onInput="${v.onProvBuscar}" placeholder="Buscar por nombre, razón social o RFC" style="flex: 1 1 220px; max-width: 360px; min-height: 40px" />
+</div>
+<div style="margin-top: 10px; max-height: 60vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc">
+<thead><tr><th>Nombre comercial</th><th>Razón social · RFC</th><th>Banco · CLABE</th><th>Datos</th><th></th></tr></thead>
+<tbody>
+${(v.provLista || []).map((p) => html`
+<tr><td style="font-weight: 600">${p.nombreComercial}${p.hasAlias ? html`<br /><span style="font-size: 11px; font-weight: 400; color: #5B5F68">también: ${p.aliasTxt}</span>` : null}</td><td>${p.beneficiario}<br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.rfc}</span></td><td><span>${p.banco}</span><br /><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px">${p.clabeFmt}</span></td><td><span style="${p.estadoStyle}">${p.estadoTxt}</span></td>
+<td style="white-space: nowrap"><button type="button" onClick="${p.editar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Editar</button>${v.canBorrarCat ? html` <button type="button" onClick="${p.borrar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Borrar</button>` : null}</td></tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+
+<div style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 12px; font-size: 18px">Obras</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="o-nom" class="lb">Nombre de la obra</label><input id="o-nom" class="in" value="${v.catObra.nombre}" onInput="${v.onObraNom}" placeholder="TORRE NORTE" /></div>
+<div style="flex: 0 1 150px; display: flex; flex-direction: column; gap: 6px"><label for="o-div" class="lb">División</label><select id="o-div" class="in" value="${v.catObra.division}" onChange="${v.onObraDiv}"><option value="HOTELERIA">HOTELERÍA</option><option value="INDUSTRIAL">INDUSTRIAL</option></select></div>
+<button type="button" onClick="${v.guardarObra}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Agregar obra</button>
+</div>
+<div style="margin-top: 14px; max-height: 36vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Obra</th><th>División</th></tr></thead><tbody>
+${(v.obraLista || []).map((o) => html`<tr><td style="font-weight: 600">${o.nombre}</td><td>${o.division}</td></tr>`)}
+</tbody></table>
+</div>
+</section>
+
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 12px; font-size: 18px">Quién solicita</h2>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="s-nom" class="lb">Nombre</label><input id="s-nom" class="in" value="${v.catSol.nombre}" onInput="${v.onSolNom}" placeholder="ING. ERICK" /></div>
+<div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px"><label for="s-pue" class="lb">Puesto u obra (opcional)</label><input id="s-pue" class="in" value="${v.catSol.puesto}" onInput="${v.onSolPue}" placeholder="Residente SMA" /></div>
+<button type="button" onClick="${v.guardarSol}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Agregar</button>
+</div>
+<div style="margin-top: 14px; max-height: 36vh; overflow-y: auto; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Nombre</th><th>Puesto u obra</th><th></th></tr></thead><tbody>
+${(v.solLista || []).map((p) => html`<tr><td style="font-weight: 600">${p.nombre}</td><td>${p.puesto}</td><td>${v.canBorrarCat ? html`<button type="button" onClick="${p.borrar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Borrar</button>` : null}</td></tr>`)}
+</tbody></table>
+</div>
+</section>
+
+${v.esDireccion ? html`
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 4px; font-size: 18px">Usuarios y permisos</h2>
+<p style="margin: 0 0 12px; font-size: 13px; color: #5B5F68">Compras ve Captura, Filtro (sólo consulta) y Catálogos. Contabilidad ve todo y registra pagos y depósitos. Dirección además autoriza. El usuario y contraseña se crean en Supabase → Authentication.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end">
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px"><label for="u-mail" class="lb">Correo</label><input id="u-mail" class="in" type="email" value="${v.rolForm.email}" onInput="${v.onRolMail}" placeholder="julieta@casyco.com" /></div>
+<div style="flex: 1 1 140px; display: flex; flex-direction: column; gap: 6px"><label for="u-nom" class="lb">Nombre</label><input id="u-nom" class="in" value="${v.rolForm.nombre}" onInput="${v.onRolNom}" placeholder="Julieta" /></div>
+<div style="flex: 0 1 160px; display: flex; flex-direction: column; gap: 6px"><label for="u-rol" class="lb">Permiso</label><select id="u-rol" class="in" value="${v.rolForm.rol}" onChange="${v.onRolRol}"><option value="compras">Compras</option><option value="contabilidad">Contabilidad</option><option value="direccion">Dirección</option></select></div>
+<button type="button" onClick="${v.guardarRol}" style="min-height: 40px; padding: 0 14px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; min-height: 44px">Guardar</button>
+</div>
+<div style="margin-top: 14px; border: 1px solid #ECEAE4; border-radius: 6px">
+<table class="t tc"><thead><tr><th>Correo</th><th>Nombre</th><th>Permiso</th><th></th></tr></thead><tbody>
+${(v.rolesLista || []).map((u) => html`<tr><td style="overflow-wrap: anywhere">${u.email}</td><td>${u.nombre}</td><td style="font-weight: 600">${u.rolTxt}</td><td><button type="button" onClick="${u.quitar}" style="min-height: 32px; padding: 0 10px; border: 1px solid #B9B7AF; border-radius: 5px; background: #FFFFFF; color: #15171C; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; color: #9F1D12">Quitar</button></td></tr>`)}
+</tbody></table>
+</div>
+</section>
+` : null}
+</div>
+</div>
+` : null}
+
+
+${v.isDepositos ? html`
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; margin-bottom: 28px">
+<section style="flex: 1 1 360px; min-width: 0; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 22px">
+<h2 style="margin: 0 0 4px; font-size: 18px">Registrar depósito del cliente</h2>
+<p style="margin: 0 0 18px; font-size: 14px; color: #5B5F68">Carga el pago de la estimación y cuánto se destina a mano de obra y a utilidad. Lo que resta es lo disponible para materiales de esa obra.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 14px">
+<div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
+<label for="d-obra" class="lb">Obra</label>
+<input id="d-obra" class="in" list="dl-obra2" value="${v.depForm.obra}" onInput="${v.onDepObra}" placeholder="GP42, TXOCO…" autocomplete="off" />
+<datalist id="dl-obra2">${(v.obras || []).map((o) => html`<option value="${o.v}"></option>`)}</datalist>
+</div>
+<div style="flex: 1 1 150px; display: flex; flex-direction: column; gap: 6px">
+<label for="d-fecha" class="lb">Fecha del depósito</label>
+<input id="d-fecha" class="in" type="date" value="${v.depFormFecha}" onChange="${v.onDepFecha}" />
+</div>
+<div style="flex: 1 1 200px; display: flex; flex-direction: column; gap: 6px">
+<label for="d-q" class="lb">Quincena que cubre</label>
+<select id="d-q" class="in" value="${v.depFormQ}" onChange="${v.onDepQForm}">${(v.qOpts || []).map((o) => html`<option value="${o.v}">${o.label}</option>`)}</select>
+</div>
+<div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
+<label for="d-monto" class="lb">Monto depositado por el cliente</label>
+<input id="d-monto" class="in" inputMode="decimal" value="${v.depForm.monto}" onInput="${v.onDepMonto}" placeholder="$ 0.00" style="font-family: 'IBM Plex Mono', monospace; font-size: 17px" />
+</div>
+<div style="flex: 1 1 130px; display: flex; flex-direction: column; gap: 6px">
+<label for="d-mo" class="lb">Mano de obra</label>
+<input id="d-mo" class="in" inputMode="decimal" value="${v.depForm.mo}" onInput="${v.onDepMo}" placeholder="$ 0.00" style="font-family: 'IBM Plex Mono', monospace" />
+</div>
+<div style="flex: 1 1 130px; display: flex; flex-direction: column; gap: 6px">
+<label for="d-ot" class="lb">Utilidad</label>
+<input id="d-ot" class="in" inputMode="decimal" value="${v.depForm.ot}" onInput="${v.onDepOt}" placeholder="$ 0.00" style="font-family: 'IBM Plex Mono', monospace" />
+</div>
+<div style="flex: 1 1 100%; display: flex; flex-direction: column; gap: 6px">
+<label for="d-nota" class="lb">Nota</label>
+<input id="d-nota" class="in" value="${v.depForm.nota}" onInput="${v.onDepNota}" placeholder="Ej. estimación 5, anticipo…" />
+</div>
+</div>
+<div style="margin-top: 16px; padding: 12px 14px; background: #F6F5F1; border: 1px dashed #C9C7BF; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+<span style="font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: #5B5F68">DISPONIBLE PARA MATERIALES · AUTO</span>
+<span style="${v.dfDispStyle}">${v.dfDispTxt}</span>
+</div>
+${v.hasDepMsg ? html`<p role="status" style="${v.depMsgStyle}">${v.depMsg}</p>` : null}
+<button type="button" onClick="${v.submitDep}" style="margin-top: 16px; width: 100%; min-height: 48px; border: none; border-radius: 6px; background: #15171C; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Registrar depósito</button>
+</section>
+
+<section style="flex: 999 1 560px; min-width: 0">
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px">
+<label for="d-ver" class="lb" style="font-size: 14px">Ver quincena</label>
+<select id="d-ver" class="in" value="${v.depQ}" onChange="${v.onDepQ}" style="width: auto; min-width: 240px; font-weight: 600">${(v.qOpts || []).map((o) => html`<option value="${o.v}">${o.label}</option>`)}</select>
+<button type="button" onClick="${v.repDep}" style="min-height: 44px; padding: 0 16px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Generar reporte ejecutivo</button>
+</div>
+<div style="background: #15171C; color: #F3F2EE; border-radius: 8px; padding: 16px 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 14px; margin-bottom: 16px">
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Depositado</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; margin-top: 6px">${v.tDepTxt}</div></div>
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Mano de obra · utilidad</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; margin-top: 6px">${v.tAsigTxt}</div></div>
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Disponible materiales</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; margin-top: 6px">${v.tDispTxt}</div></div>
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Materiales (OCs)</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 18px; font-weight: 600; margin-top: 6px">${v.tMatTxt}</div></div>
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Saldo quincena</div><div style="${v.tSaldoStyle}">${v.tSaldoTxt}</div></div>
+<div><div style="font-size: 12px; color: #C9C7BF; font-weight: 600">Saldo acumulado</div><div style="${v.tAcumStyle}">${v.tAcumTxt}</div><div style="font-size: 11px; color: #C9C7BF">anterior ${v.tAntTxt}</div></div>
+</div>
+
+${v.saldoEmpty ? html`<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 16px; margin: 0 0 16px; color: #5B5F68">Sin depósitos ni OCs en esta quincena.</p>` : null}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; align-items: start">
+${(v.saldoObras || []).map((o) => html`
+<section style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; overflow: hidden">
+<h3 style="margin: 0; padding: 10px 14px; font-size: 15px; background: #15171C; color: #F3F2EE">${o.name}</h3>
+<div style="padding: 12px 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; font-size: 13px">
+<span>Depósito del cliente</span><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; text-align: right">${o.depTxt}</span>
+<span style="color: #5B5F68">− Mano de obra</span><span style="font-family: 'IBM Plex Mono', monospace; color: #5B5F68; text-align: right">${o.moTxt}</span>
+<span style="color: #5B5F68">− Utilidad</span><span style="font-family: 'IBM Plex Mono', monospace; color: #5B5F68; text-align: right">${o.otTxt}</span>
+<span style="font-weight: 700; border-top: 1px solid #DDDBD4; padding-top: 5px">= Disponible materiales</span><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 700; text-align: right; border-top: 1px solid #DDDBD4; padding-top: 5px">${o.dispTxt}</span>
+<span>− Materiales (${o.nOc} OCs)</span><span style="font-family: 'IBM Plex Mono', monospace; text-align: right">${o.matTxt}</span>
+<span style="grid-column: 1 / -1; font-size: 11px; color: #5B5F68">pagado ${o.matPagTxt} · por pagar / en filtro ${o.matPendTxt}</span>
+<span style="font-weight: 700; border-top: 2px solid #15171C; padding-top: 6px">= Saldo de la quincena</span><span style="${o.saldoStyle}; text-align: right; border-top: 2px solid #15171C; padding-top: 6px">${o.saldoTxt}</span>
+<span style="color: #5B5F68">+ Saldo de quincenas anteriores</span><span style="font-family: 'IBM Plex Mono', monospace; color: #5B5F68; text-align: right">${o.antTxt}</span>
+<span style="font-weight: 700; background: #F6F5F1; padding: 6px 4px">= Saldo acumulado</span><span style="${o.acumStyle}; text-align: right; background: #F6F5F1; padding: 6px 4px">${o.acumTxt}</span>
+</div>
+<div style="padding: 0 14px 12px">
+<div style="height: 8px; background: #E4E2DB; border-radius: 4px; overflow: hidden"><div style="${o.barStyle}"></div></div>
+<div style="${o.estadoStyle}; margin-top: 5px">${o.estado}</div>
+</div>
+</section>
+`)}
+</div>
+
+<h3 style="margin: 24px 0 10px; font-size: 16px">Depósitos de la ${v.depQLabel}</h3>
+${v.depListEmpty ? html`<p style="font-size: 14px; color: #5B5F68; margin: 0">Aún no hay depósitos registrados en esta quincena.</p>` : null}
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<tbody>
+${(v.depList || []).map((d) => html`
+<tr>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${d.fechaTxt}</td>
+<td style="overflow-wrap: anywhere"><span style="font-weight: 600">${d.obra}</span><br /><span style="font-size: 11px; color: #5B5F68">${d.asigTxt}</span><br /><span style="font-size: 11px; color: #5B5F68">${d.nota}</span></td>
+<td class="n">${d.montoTxt}<br /><span style="font-size: 11px; color: #14532D">mat. ${d.dispTxt}</span></td>
+<td><button type="button" onClick="${d.onDel}" aria-label="Eliminar depósito" style="min-height: 32px; border: none; background: transparent; color: #9F1D12; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer">Eliminar</button></td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+</div>
+` : null}
+
+
+${v.isBanco ? html`
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 20px">
+<div>
+<h2 style="margin: 0; font-size: 20px">Estado de cuenta · pagos con cuenta ${v.bkNombre}</h2>
+<p style="margin: 4px 0 0; font-size: 14px; color: #5B5F68">Paga: ${v.bkPaga}. Cada OC que se registre como pagada con esta cuenta aparece aquí sola.</p>
+</div>
+<button type="button" onClick="${v.repBanco}" style="min-height: 44px; padding: 0 16px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Generar reporte ejecutivo</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px">
+<div style="background: #15171C; color: #F3F2EE; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #C9C7BF; font-weight: 600">Total pagado</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px; color: #F59E0B">${v.bkTotTxt}</div>
+<div style="font-size: 13px; color: #C9C7BF">${v.bkN} pagos</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Pagado en ${v.bkMesLabel}</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px">${v.bkMTxt}</div>
+<div style="font-size: 13px; color: #5B5F68">${v.bkMN} pagos</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Pagado en la ${v.bkQLabel}</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px">${v.bkQTxt}</div>
+<div style="font-size: 13px; color: #5B5F68">${v.bkQN} pagos</div>
+</div>
+</div>
+${v.bkEmpty ? html`<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 16px; color: #5B5F68">Aún no hay pagos registrados con esta cuenta.</p>` : null}
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+<section style="flex: 1 1 300px; min-width: 0">
+<h3 style="margin: 0 0 12px; font-size: 17px">Pagado por obra</h3>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">Pagos</th><th style="text-align: right">Monto</th><th style="text-align: right">%</th></tr></thead>
+<tbody>
+${(v.bkObras || []).map((o) => html`<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.n}</td><td class="n">${o.totalTxt}</td><td class="n">${o.pct}</td></tr>`)}
+</tbody>
+<tfoot><tr><td>Total</td><td class="n">${v.bkN}</td><td class="n">${v.bkTotTxt}</td><td class="n">100%</td></tr></tfoot>
+</table>
+</div>
+</section>
+<section style="flex: 999 1 560px; min-width: 0">
+<h3 style="margin: 0 0 12px; font-size: 17px">Movimientos · lo más reciente arriba</h3>
+<div style="max-height: 65vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<thead><tr><th>Fecha pago</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th style="text-align: right">Acumulado</th></tr></thead>
+<tbody>
+${(v.bkMovs || []).map((m) => html`
+<tr><td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${m.fechaTxt}</td><td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${m.oc}</td><td style="overflow-wrap: anywhere"><span style="font-weight: 600">${m.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${m.proveedor}</span></td><td class="n">${m.montoTxt}</td><td class="n" style="font-weight: 700">${m.acumTxt}</td></tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+</div>
+` : null}
+
+
+${v.isPersonal ? html`
+<div style="margin-bottom: 20px">
+<h2 style="margin: 0; font-size: 20px">Estado de cuenta · pagos con cuentas personales de Manuel Castillo</h2>
+<p style="margin: 4px 0 0; font-size: 14px; color: #5B5F68">Cada OC pagada con cuenta personal entra aquí sola y queda pendiente hasta que CASYCO te la devuelva.</p>
+<button type="button" onClick="${v.repPers}" style="min-height: 44px; margin-top: 12px; padding: 0 16px; border: none; border-radius: 6px; background: #1E3A8A; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Generar reporte ejecutivo</button>
+</div>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px">
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Pagado con cuentas personales</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px">${v.persTotalTxt}</div>
+<div style="font-size: 13px; color: #5B5F68">${v.persN} OCs</div>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #5B5F68; font-weight: 600">Devuelto</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px; color: #14532D">${v.persDevTxt}</div>
+<div style="font-size: 13px; color: #5B5F68">${v.persDevN} OCs</div>
+</div>
+<div style="background: #15171C; color: #F3F2EE; border-radius: 8px; padding: 18px">
+<div style="font-size: 13px; color: #C9C7BF; font-weight: 600">Saldo por devolver a Manuel</div>
+<div style="font-family: 'IBM Plex Mono', monospace; font-size: 24px; font-weight: 600; margin-top: 6px; color: #F59E0B">${v.persPendTxt}</div>
+<div style="font-size: 13px; color: #C9C7BF">${v.persPendN} OCs</div>
+</div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 28px; align-items: flex-start">
+<section style="flex: 999 1 560px; min-width: 0">
+<h3 style="margin: 0 0 12px; font-size: 17px">Por devolver</h3>
+${v.persPendEmpty ? html`<p style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px; padding: 16px; margin: 0; color: #5B5F68">No hay pagos pendientes de devolución.</p>` : null}
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<thead><tr><th>Pagada</th><th>OC</th><th>Obra · proveedor</th><th style="text-align: right">Monto</th><th></th></tr></thead>
+<tbody>
+${(v.persPend || []).map((r) => html`
+<tr>
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${r.fpCorto}<br /><span style="font-size: 11px; color: #5B5F68; font-family: 'IBM Plex Sans', sans-serif">hace ${r.diasDev} d</span></td>
+<td style="font-family: 'IBM Plex Mono', monospace; font-weight: 600; white-space: nowrap">${r.oc}</td>
+<td style="overflow-wrap: anywhere"><span style="font-weight: 600">${r.obra}</span><br /><span style="font-size: 12px; color: #5B5F68">${r.proveedor}</span></td>
+<td class="n">${r.montoTxt}</td>
+<td><button type="button" onClick="${r.onDevolver}" style="min-height: 36px; padding: 0 10px; border: 1px solid #1F6F43; border-radius: 6px; background: #FFFFFF; color: #14532D; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap">Registrar devolución</button></td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+</section>
+<section style="flex: 1 1 280px; min-width: 0">
+<h3 style="margin: 0 0 12px; font-size: 17px">Por devolver por obra</h3>
+<div style="background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<thead><tr><th>Obra</th><th style="text-align: right">OCs</th><th style="text-align: right">Monto</th></tr></thead>
+<tbody>
+${(v.persObras || []).map((o) => html`
+<tr><td style="font-weight: 600">${o.name}</td><td class="n">${o.n}</td><td class="n">${o.totalTxt}</td></tr>
+`)}
+</tbody>
+<tfoot><tr><td>Total</td><td></td><td class="n">${v.persPendTxt}</td></tr></tfoot>
+</table>
+</div>
+${v.persDevEmpty ? html`
+<p style="font-size: 13px; color: #5B5F68; margin: 12px 0 0">Aún no hay devoluciones registradas.</p>
+` : null}
+<div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px">
+${(v.persDev || []).map((r) => html`
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; background: #F1F8F4; border-radius: 6px; padding: 6px 10px">
+<span><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${r.oc}</span> · ${r.devTxt}</span>
+<button type="button" onClick="${r.onDeshacerDev}" style="border: none; background: transparent; color: #1E3A8A; font: inherit; font-size: 12px; text-decoration: underline; cursor: pointer; min-height: 32px">Deshacer</button>
+</div>
+`)}
+</div>
+</section>
+</div>
+
+<h3 style="margin: 0 0 12px; font-size: 17px">Movimientos</h3>
+<div style="max-height: 65vh; overflow-y: auto; background: #FFFFFF; border: 1px solid #DDDBD4; border-radius: 8px">
+<table class="t tc">
+<thead><tr><th>Fecha</th><th>Concepto</th><th>OC · obra</th><th style="text-align: right">Cargo</th><th style="text-align: right">Abono</th><th style="text-align: right">Saldo</th></tr></thead>
+<tbody>
+${(v.edoCta || []).map((m) => html`
+<tr style="${m.rowStyle}">
+<td style="font-family: 'IBM Plex Mono', monospace; white-space: nowrap">${m.fechaTxt}</td>
+<td>${m.concepto}</td>
+<td style="overflow-wrap: anywhere"><span style="font-family: 'IBM Plex Mono', monospace; font-weight: 600">${m.oc}</span> · ${m.obra}<br /><span style="font-size: 12px; color: #5B5F68">${m.proveedor}</span></td>
+<td class="n">${m.cargoTxt}</td>
+<td class="n" style="color: #14532D">${m.abonoTxt}</td>
+<td class="n" style="font-weight: 700">${m.saldoTxt}</td>
+</tr>
+`)}
+</tbody>
+</table>
+</div>
+` : null}
+
+</main>
+</div>
+`;
+
+
+const SUPA_URL = 'https://uwagkfbsvgrbqfkaovji.supabase.co';
+const SUPA_KEY = 'sb_publishable_v1TC4aU1WXAKSFuN-QMY0w_oJn1VEuk';
+const sb = window.supabase.createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+// Adaptador: misma forma que usaba la app (doc(path).set/update/delete) sobre la tabla docs
+const __cache = {};
+function __split(path) { const i = path.indexOf('/'); return [path.slice(0, i), path.slice(i + 1)]; }
+async function __ok(res) { if (res.error) { const e = new Error(res.error.message); e.code = res.error.code || 'error'; throw e; } return res; }
+const dbAdapter = {
+  doc(path) {
+    const [col, id] = __split(path);
+    return {
+      set: (data) => { __cache[path] = data; return sb.from('docs').upsert({ coleccion: col, id, data }).then(__ok); },
+      update: (patch) => { const data = Object.assign({}, __cache[path] || {}, patch); __cache[path] = data; return sb.from('docs').upsert({ coleccion: col, id, data }).then(__ok); },
+      delete: () => { delete __cache[path]; return sb.from('docs').delete().eq('coleccion', col).eq('id', id).then(__ok); }
+    };
+  }
+};
+
+const uniq = (arr) => Array.from(new Set(arr.filter(Boolean))).sort();
+function __aplicar(c) {
+  const rows = [], deposits = [], persHist = [], proveedoresCat = [], solicitantesCat = []; let obras = null;
+  Object.keys(__cache).forEach(k => {
+    const [col, id] = __split(k), d = __cache[k];
+    if (col === 'ocs') rows.push(Object.assign({}, d, { id }));
+    else if (col === 'depositos') deposits.push(Object.assign({}, d, { id }));
+    else if (col === 'personal') persHist.push(Object.assign({}, d, { hid: id }));
+    else if (col === 'proveedores') proveedoresCat.push(Object.assign({}, d, { id }));
+    else if (col === 'solicitantes') solicitantesCat.push(Object.assign({}, d, { id }));
+    else if (col === 'config' && id === 'obras') obras = d.map || {};
+  });
+  const patch = { rows, deposits, persHist, proveedoresCat, solicitantesCat, proveedores: uniq(rows.map(r => r.proveedor)), solicitantes: uniq(rows.map(r => r.solicita)) };
+  if (obras) patch.obraDiv = Object.assign({}, c.state.obraDiv, obras);
+  c.setState(patch);
+}
+let __canal = null, __aplTimer = null;
+async function __cargarDatos(c) {
+  const res = await sb.from('docs').select('coleccion,id,data').limit(5000);
+  if (res.error) { c.setState({ loaded: true, dbOk: false, dbMsg: 'No se pudieron leer los datos (' + res.error.message + ').' }); return; }
+  Object.keys(__cache).forEach(k => delete __cache[k]);
+  res.data.forEach(r => { __cache[r.coleccion + '/' + r.id] = r.data; });
+  __aplicar(c); c.setState({ loaded: true, dbOk: true });
+  if (__canal) sb.removeChannel(__canal);
+  __canal = sb.channel('docs-cambios')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'docs' }, (p) => {
+      if (p.eventType === 'DELETE') { const o = p.old || {}; if (o.coleccion) delete __cache[o.coleccion + '/' + o.id]; else return __cargarDatos(c); }
+      else { const n = p.new; __cache[n.coleccion + '/' + n.id] = n.data; }
+      clearTimeout(__aplTimer); __aplTimer = setTimeout(() => __aplicar(c), 60);
+    })
+    .subscribe();
+}
+
+// ---------- inicio de sesión ----------
+const loginEl = document.getElementById('login'), appEl = document.getElementById('app');
+function verLogin(msg) {
+  appEl.hidden = true; loginEl.hidden = false;
+  const m = document.getElementById('login-msg'); m.textContent = msg || ''; m.hidden = !msg;
+}
+document.getElementById('login-form').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const email = document.getElementById('login-email').value.trim(), pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn'); btn.disabled = true; btn.textContent = 'Entrando…';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled = false; btn.textContent = 'Entrar';
+  if (error) verLogin('Correo o contraseña incorrectos. Revisa los datos o pide tu acceso a Manuel.');
+});
+window.__salir = async () => { await sb.auth.signOut(); location.replace('../'); };
+window.__rolesApi = {
+  cargar: async () => { const r = await sb.from('roles').select('email,nombre,rol').order('email'); if (!r.error && __inst) __inst.setState({ rolesList: r.data || [] }); return r; },
+  guardar: (u) => sb.from('roles').upsert(u),
+  quitar: (email) => sb.from('roles').delete().eq('email', email)
+};
+
+let __arrancada = false;
+async function arrancar(session) {
+  loginEl.hidden = true; appEl.hidden = false;
+  if (!__inst) { __inst = new Component({}); }
+  __inst.db = dbAdapter;
+  __inst.setState({ userEmail: session.user.email || '' });
+  const rr = await sb.rpc('mi_rol');
+  // Si la función de permisos aún no existe en la base (antes de correr el SQL 02), se conserva el acceso completo.
+  const sinFuncion = rr && rr.error && (rr.error.code === 'PGRST202' || /mi_rol/i.test(rr.error.message || ''));
+  __inst.setState({ rol: sinFuncion ? 'direccion' : ((rr && !rr.error && rr.data) ? rr.data : '') });
+  if (rr && rr.data === 'direccion') window.__rolesApi.cargar();
+  __render();
+  if (!__arrancada) { __arrancada = true; await __cargarDatos(__inst); }
+}
+sb.auth.onAuthStateChange((evento, session) => {
+  if (session) arrancar(session);
+  else { __arrancada = false; if (__canal) { sb.removeChannel(__canal); __canal = null; } verLogin(evento === 'SIGNED_OUT' ? 'Sesión cerrada.' : ''); }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && __inst && __arrancada) __cargarDatos(__inst); });
+
+</script>
+</body>
+</html>
